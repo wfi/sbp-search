@@ -5,5 +5,5 @@
 (load "slide-puzzle-inits")
 
 
-(defparameter **path-to-file-storage** "./storage/")
+(defparameter **path-to-file-storage** "/Volumes/EXT-3TB-B/SEARCH-FILE-STORAGE/")
 (defparameter **max-buffer-position-count** 5000000)
