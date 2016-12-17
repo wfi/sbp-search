@@ -59,10 +59,11 @@ Procedure External A*
 
 (defparameter **debug** nil)
 
+(defparameter **equality-test** nil)  ;; needed to compile -- gets set in SBP-SETUP-EXT-ASTAR
+
+
 ;; for hash-tables
 #|
-(defparameter **equality-test**
-  #'eql)
 (defparameter **new-ht-size** 100000)
 ;(defparameter **new-ht-size** 65684160)
 (defparameter **empty-dummy-hash-table**

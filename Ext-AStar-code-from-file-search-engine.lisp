@@ -310,8 +310,8 @@
 (defparameter **path-to-file-storage**
   ;"/Users/glenniba/temp/SEARCH-FILE-STORAGE/"
   ; /Volumes/EXT1-OTHER/SEARCH-FILE-STORAGE/"
-  ; "/Volumes/EXT-3TB-B/SEARCH-FILE-STORAGE/"
-  "/Volumes/Seagate6TB/SEARCH-FILE-STORAGE/"
+  "/Volumes/EXT-3TB-B/SEARCH-FILE-STORAGE/"
+  ; "/Volumes/Seagate6TB/SEARCH-FILE-STORAGE/"
   )
 
 ;; convenience function
@@ -981,8 +981,8 @@ ratio))
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 
-
-
+;;; SAVE THIS -- BUT NEEDS TO BE UPDATED
+#| 
 (defun write-initial-fringe (start-position-list &optional (depth 0))
   ;; needs to be sorted!
   (loop with outbuff = (new-output-buffer depth 1)   ;; write as segments, in case too large to fit in buffer all at once
@@ -994,6 +994,8 @@ ratio))
      (merge-segments depth)  
      (delete-fringe-segments depth)))
   
+|#
+
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; TIMING FUNCTIONS MOVED ->  MY-PROFILER.LISP
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -1008,6 +1010,8 @@ ratio))
 ;;;   OK - Fixed now - by making find-prior-position branch on **moves-invertible?**
 ;;;      (and using either find-prior-position-if-invertible or find-prior-position-not-invertible)
 
+;;; SAVE -- though not used now -- update for solution recovery when needed
+#|
 (defun recover-solution-sequence (final-depth final-position)   ;; note works with compressed (byte) positions
   (loop with compressed-solution-sequence = (list final-position)
         for depth from final-depth downto 1
@@ -1081,6 +1085,7 @@ ratio))
        (close-buffer inbuff-a)
        (close-buffer inbuff-b)
        (return common-position)))   ;; NIL if none found, else the position itself
+|#
 
 (defun fancy-display-compressed-solution-sequence (&optional (compressed-solution-sequence **compressed-solution-sequence**))
   (loop for byte-pos in compressed-solution-sequence
