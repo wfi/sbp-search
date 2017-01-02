@@ -153,8 +153,7 @@ Procedure External A*
 	  ;; A0, A1, A2
 	  ;;(g h write-segments? out-buff-to-repoint)
 
-	    (expand-bucket g-min h-max)
-
+	    (merge-and-expand-bucket g-min h-max)
 
 	  ;;gmin ← gmin + 1
 	    (incf g-min)
@@ -566,6 +565,7 @@ Procedure External A*
   )
 
 
+#|
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; BIT FLIP -- TEST DOMAIN
@@ -608,7 +608,7 @@ Procedure External A*
 	**successors-fun** #'bit-flip-successors
 	**equality-test** #'eql))
 
-#|
+
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; BIT FLIP 2 -- TEST DOMAIN
 ;;;    [now allow flipping 1 or 2 bits]

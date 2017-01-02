@@ -309,6 +309,7 @@ fringe-positions
 ratio))
   |#
 
+#|
 ;; was delete-fringe-segments
 (defun delete-bucket-segments (g h)
   (loop for segnum from 1
@@ -320,10 +321,12 @@ ratio))
 (defun delete-bucket (g h)
   (when (bucket-exists? g h)   ;; TODO - check for name-conflict with EXT-A* code
     (delete-file (bucket-pathname g h))))
+|#
+
 
 ;;; debugging files
 
-
+#|
 (defun find-first-diff (pathname1 pathname2)
   (loop
      with inbuff1 = (new-input-buffer pathname1)
@@ -334,7 +337,7 @@ ratio))
 		(equalp pos1 pos2))  
      finally
        (return (list pos1 pos2))))    ;; Note: should return (NIL NIL) if files identical
-
+|#
 
 
 
@@ -645,6 +648,7 @@ ratio))
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 
+#|
 ;;; this decides which version (heap or not) should be used based on **heap-threshold**
 ;;;   Now records data and deletes segments
 (defun merge-segments (g h)
@@ -774,6 +778,7 @@ ratio))
 	  (close-buffer inbuff))
        (close-buffer output-buffer)
        )))
+|#
 
 (defun collect-prior-buckets (g h)
   (loop with least-depth-prior-fringe = (- g 2)  ;; look at previous 2 buckets with same h

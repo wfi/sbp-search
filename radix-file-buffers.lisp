@@ -387,8 +387,32 @@
 ;; was fringe-exists?
 ;; TODO: Rewrite for RADIX
 (defun bucket-exists? (g h)
+  ;; now check for any file with any radix satisfying g & h
   (and (array-in-bounds-p **open** g h)
-       (probe-file (bucket-pathname g h))))
+       (all-bucket-files? g h nil nil)))
+
+;; kludge -- use directory to search for any files in bucket
+(defun all-bucket-files? (g h)        ;; raw or not, any radix
+  (directory (wild-card-bucket-pathname g h)))
+
+(defun all-raw-bucket-files? (g h)
+  (directory (wild-card-bucket-pathname-raw g h)))
+
+(defun wild-card-bucket-pathname (g h)   ;; with or without radix
+  (format nil
+	  "~a~a/bucket-~a-~a-*.data"
+	  **path-to-file-storage**
+	  **puzzle-directory-name** 
+	  g
+	  h))
+
+(defun wild-card-bucket-pathname-raw (g h)
+  (format nil
+	  "~a~a/bucket-~a-~a-*-raw.data" 
+	  **path-to-file-storage**
+	  **puzzle-directory-name** 
+	  g h))
+
 
 ;; was fringe-segment-exists?
 (defun bucket-segment-exists? (g h segment-number)
@@ -481,6 +505,7 @@ fringe-positions
 ratio))
   |#
 
+#|
 ;; was delete-fringe-segments
 (defun delete-bucket-segments (g h)
   (loop for segnum from 1
@@ -492,10 +517,12 @@ ratio))
 (defun delete-bucket (g h)
   (when (bucket-exists? g h)   ;; TODO - check for name-conflict with EXT-A* code
     (delete-file (bucket-pathname g h))))
+|#
+
 
 ;;; debugging files
 
-
+#|
 (defun find-first-diff (pathname1 pathname2)
   (loop
      with inbuff1 = (new-input-buffer pathname1)
@@ -505,6 +532,7 @@ ratio))
      while (equalp pos1 pos2)   ;; might this never terminate if contents identical ??
      finally
        (return (list pos1 pos2))))
+|#
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;  Merging and Expanding Buckets
@@ -521,73 +549,78 @@ ratio))
 
 
 (defun merge-bucket (g-min h-max)
-  ;;; For each radix (non-empty)
-  ;;;    Load file into hash-table
-  ;;;    Filter by previous 2 (g-1 g-2) h radix buckets
-  ;;;    Write hash-table to file
-  )
+  (loop for radix from 0 below 256    ;; generalize to Radix-count (using radix-bit-count ?)
+     for raw-pathname = (bucket-radix-pathname g-min h-max radix t)  ;; T = add-raw
+     for prior-g-pathname = (bucket-radix-pathname (1- g-min) h-max radix nil)  ;; NOT RAW
+     for prior-2-g-pathname = (bucket-radix-pathname (- g-min 2) h-max radix nil)  ;; NOT RAW
+     do
+       (load-hash-table-from-file raw-pathname)    ;; TODO: generalize so can load/filter in stages
+       (when (probe-file prior-g-pathname)
+	 (filter-hash-table-with-file prior-g-pathname))
+       (when (probe-file prior-2-g-pathname)
+	 (filter-hash-table-with-file prior-2-g-pathname))
+       (write-hash-table-to-radix-bucket g-min h-max radix)))
+
+
 
 ;;; EXPAND
 ;;;  Expand g h radix
 ;;;   Repoints A0, A1, and A2 (using **out-buff-0** **out-buff-1** **out-buff-2**)
 ;;;     to 
 
+(defun expand-bucket (g h)
+  (loop with output-object = (list h
+				   (get-bucket-out (1+ g-min) (1- h-max) **out-buff-0**)   ;; A0
+				   (get-bucket-out (1+ g-min) (1- h-max) **out-buff-1**)   ;; A1
+				   (get-bucket-out (1+ g-min) (1+ h-max) **out-buff-2**)   ;; A2
+				   )
+     for radix from 0 below 256
+     for bucket-radix-pathname = (bucket-radix-pathname g h radix nil)   ;; expand only non-raw file
+     when (probe-file bucket-radix-pathname)
+     do
+       (expand-radix-bucket g h radix output-object)   ;; output-object same for all radix vals
+     finally
+     ;; Close-buffers A0, A1, A2
+       (loop for out-buff in (cdr output-object)
+	    when out-buff
+	    (close-buffer out-buff))))
 
-(defun expand-bucket (g-min h-max)
-  ;;; LOOP OVER RADIX
-  (let* ((A2 ;; [A2] Open(gmin + 1, hmax + 1) ← A(fmin + 2)
-	  (get-bucket-out (1+ g-min) (1+ h-max) t **out-buff-2**))
-	 (A1 ;; [A1] Open(gmin + 1, hmax) ← A(fmin + 1) ∪ Open(gmin + 1, hmax)
-	  (get-bucket-out (1+ g-min) h-max t **out-buff-1**))
-	 (A0 ;; [A0] Open(gmin + 1, hmax − 1) ← A(fmin) ∪ Open(gmin + 1, hmax − 1)
-	  (get-bucket-out (1+ g-min) (1- h-max) t **out-buff-0**))
-	 (output-object
-	  (list h-max A0 A1 A2)))
-    (when **debug**
-      (print 'output-object) 
-      (princ output-object))
-    (loop with sol-pos? = nil
-       with in-buff = (get-bucket-in g-min h-max)
-       for pos = (when in-buff (front-position in-buff)) then (next-position in-buff)
-       while (and pos
-		  (not **solution**))
-       do
-	 (inc-counter 'expanded-positions)
+
+(defun expand-radix-bucket (g-min h-max radix output-object)
+  (when **debug**
+    (print 'output-object) 
+    (princ output-object))
+  (loop with sol-pos? = nil
+     with in-buff = (get-bucket-in g-min h-max)
+     for pos = (when in-buff (front-position in-buff)) then (next-position in-buff)
+     while (and pos
+		(not **solution**))
+     do
+       (inc-counter 'expanded-positions)
 					;(print 'before-calling-generate-successors)
-	 (when **debug**
-	   (print 'generating-successors-of-pos)
-	   (princ pos))
-	 (setf sol-pos? (generate-successors pos output-object))
+       (when **debug**
+	 (print 'generating-successors-of-pos)
+	 (princ pos))
+       (setf sol-pos? (generate-successors pos output-object))
 					;(print 'after-calling-generate-successors)
-	 (when sol-pos?
-	   (setf  **solution** (list sol-pos? (1+ g-min)))
-	   (format t "~%FOUND SOLUTION WITH G-VAL = ~a" (1+ g-min)))
+       (when sol-pos?
+	 (setf  **solution** (list sol-pos? (1+ g-min)))
+	 (format t "~%FOUND SOLUTION WITH G-VAL = ~a" (1+ g-min)))
 
-       finally
-	 (when in-buff
-	   (close-buffer in-buff))
-	 )
-    ;; Close-buffers A0, A1, A2
-    (when A0
-      (close-buffer A0))
-    (when A1
-      (close-buffer A1))
-    (when A2
-      (close-buffer A2))
-    ))
+     finally
+       (when in-buff
+	 (close-buffer in-buff))
+       ))
 
-
-(defun get-bucket-out (g h write-segments? out-buff-to-repoint)
+(defun get-bucket-out (g h out-buff-to-repoint)
   (when (array-in-bounds-p **open** g h) ;; return nil if indices out of bounds
-    (let ((next-segment? (if write-segments?
-			     (lookup-next-segment g h) ;; defaults to 1 if not found
-			     nil))) ;; nil means don't write segments
-      (point-output-buffer out-buff-to-repoint
-			   g h next-segment?))))
+    (point-radix-output-buffer out-buff-to-repoint g h)))
 
 
-(defun get-bucket-in (g h)
+(defun get-bucket-in (g h radix)
   (when (bucket-exists? g h)
     (new-input-buffer (bucket-pathname g h)))
+  )
+
   )
 
