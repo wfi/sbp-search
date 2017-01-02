@@ -22,6 +22,11 @@
 ;;;    Create separate EXPAND-BUCKET function
 ;;;       This will be responsible for doing the merge before expanding
 
+;;; 1-2-2017
+;;;    Refactor to separate out merge and expand functions
+;;;    A-Star code now calls MERGE-AND-EXPAND-BUCKET
+;;;       Which in turn calls merge and expand on each radix in the bucket
+
 #|
 PSEUDO CODE:
 
@@ -186,48 +191,11 @@ Procedure External A*
 ;;; EXPAND BUCKET
 ;;;   This now triggers the merge before expanding
 
-(defun expand-bucket (g-min h-max)
+(defun merge-and-expand-bucket (g-min h-max)
   (merge-segments g-min h-max) ;; Merge / filter bucket before expanding (check if merge-file exists)
-  (let* ((A2 ;; [A2] Open(gmin + 1, hmax + 1) ← A(fmin + 2)
-	  (get-bucket-out (1+ g-min) (1+ h-max) t **out-buff-2**))
-	 (A1 ;; [A1] Open(gmin + 1, hmax) ← A(fmin + 1) ∪ Open(gmin + 1, hmax)
-	  (get-bucket-out (1+ g-min) h-max t **out-buff-1**))
-	 (A0 ;; [A0] Open(gmin + 1, hmax − 1) ← A(fmin) ∪ Open(gmin + 1, hmax − 1)
-	  (get-bucket-out (1+ g-min) (1- h-max) t **out-buff-0**))
-	 (output-object
-	  (list h-max A0 A1 A2)))
-    (when **debug**
-      (print 'output-object) 
-      (princ output-object))
-    (loop with sol-pos? = nil
-       with in-buff = (get-bucket-in g-min h-max)
-       for pos = (when in-buff (front-position in-buff)) then (next-position in-buff)
-       while (and pos
-		  (not **solution**))
-       do
-	 (inc-counter 'expanded-positions)
-					;(print 'before-calling-generate-successors)
-	 (when **debug**
-	   (print 'generating-successors-of-pos)
-	   (princ pos))
-	 (setf sol-pos? (generate-successors pos output-object))
-					;(print 'after-calling-generate-successors)
-	 (when sol-pos?
-	   (setf  **solution** (list sol-pos? (1+ g-min)))
-	   (format t "~%FOUND SOLUTION WITH G-VAL = ~a" (1+ g-min)))
+  (expand-bucket g-min h-max))
 
-       finally
-	 (when in-buff
-	   (close-buffer in-buff))
-	 )
-    ;; Close-buffers A0, A1, A2
-    (when A0
-      (close-buffer A0))
-    (when A1
-      (close-buffer A1))
-    (when A2
-      (close-buffer A2))
-    ))
+;;; Merge and Expand moved to another file to isolate different implementations
 
 
 ;;;; OPEN BUCKET INFO
@@ -272,18 +240,6 @@ Procedure External A*
 
 ;;;;;;;;;;;;;;;;
 
-(defun get-bucket-out (g h write-segments? out-buff-to-repoint)
-  (when (array-in-bounds-p **open** g h) ;; return nil if indices out of bounds
-    (let ((next-segment? (if write-segments?
-			     (lookup-next-segment g h) ;; defaults to 1 if not found
-			     nil))) ;; nil means don't write segments
-      (point-output-buffer out-buff-to-repoint
-			   g h next-segment?))))
-
-(defun get-bucket-in (g h)
-  (when (bucket-exists? g h)
-    (new-input-buffer (bucket-pathname g h)))
-  )
 
 
 ;; deleted new-bucket 
@@ -313,12 +269,13 @@ Procedure External A*
   |#
   )
 
+#|
 ;; only called to store initial-position (should start new bucket)
 (defun store-bucket (position g h)   ;; NOTE: doesn't check for array-in-bounds-p (assumed ok)
   (let ((out-buff (point-output-buffer **out-buff-0** g h nil)))   ;; nil for "No Segments"
     (write-position out-buff position)
     (close-buffer out-buff)))
-
+|#
 
 (defun empty-bucket? (g h)
   (cond ((not (array-in-bounds-p **open** g h))
@@ -333,6 +290,7 @@ Procedure External A*
 		 always (zerop (get-file-size bucket-seg-path)))))))
 
 
+#|
 (defun recover-solution (solution-pair)
   (let ((sol-seq (recover-solution-sequence solution-pair)))
     (loop for pos in sol-seq
@@ -351,8 +309,6 @@ Procedure External A*
      finally
        (return sol-seq)))
 
-
-
 ;; only use when moves are INVERTIBLE (not true for SBP <<-- HUH??)
 (defun find-parent (pos g)
   ;; need to look at buckets (g-1, h+1) (g-1, h) and (g-1, h-1)
@@ -370,8 +326,10 @@ Procedure External A*
     (loop for pos being the hash-keys of ht-bucket
        when (member pos poss-parent-list :test **equality-test**)
 	 return pos)))
-		    
+|#
 
+
+#|
 (defun count-all-positions ()
   (loop with array-dims = (array-dimensions **open**)
      with (rows cols) = array-dims
@@ -402,11 +360,13 @@ Procedure External A*
      for bucket =  (aref **open** row col)
      when bucket
      sum (hash-table-count bucket)))
+|#
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; COLLECT FINAL DATA
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
+#|
 (defparameter **final-bucket-pattern** nil)
 (defparameter **ht-growth-data** nil)
 (defparameter **generation-sizes** nil)  ;; sum over each g-val
@@ -482,6 +442,7 @@ Procedure External A*
   (pprint **ht-growth-data**)
   (print '**generation-sizes**)
   (mapcar #'print **generation-sizes**))
+|#
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; SBP INTERFACE
@@ -647,7 +608,7 @@ Procedure External A*
 	**successors-fun** #'bit-flip-successors
 	**equality-test** #'eql))
 
-
+#|
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; BIT FLIP 2 -- TEST DOMAIN
 ;;;    [now allow flipping 1 or 2 bits]
@@ -945,7 +906,7 @@ Procedure External A*
 	**equality-test** #'equalp
 	))
 
- 
+|# 
 
 
 
