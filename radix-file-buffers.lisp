@@ -65,9 +65,10 @@
        (= (length pos) **position-size**)
        (equal (array-element-type pos)
 	      (list 'unsigned-byte **byte-size**))))
-
 |#
 
+
+(defparameter **max-radix-buffer-position-count** 5000)
 (defparameter **max-buffer-position-count** 1000000) ;; smaller since used for each radix buffer
 ;; (defvar **max-buffer-position-count**)
 (defvar **position-size**)
@@ -105,7 +106,7 @@
       (loop for radix from 0 below radix-count
 	 do
 	   (setf (aref lin-outbuff-vector radix)
-		 (new-linear-output-buffer **max-buffer-position-count**
+		 (new-linear-output-buffer **max-radix-buffer-position-count**
 					   pos-size
 					   **byte-size**))
 	   ))
@@ -122,7 +123,8 @@
 	 for lin-outbuff = (aref lin-outbuff-vector radix)
        do
 	 (point-linear-output-buffer lin-outbuff g h radix t)   ;; t so raw? = t
-	 )))
+	 ))
+  radix-outbuff)    ;; return the radix-outbuff
 
 (defmethod write-position ((radix-outbuff radix-output-buffer) position)
   (with-slots (lin-outbuff-vector radix-mask position-index-for-radix)
@@ -162,7 +164,7 @@
 ;;;   NOW ONLY MAKES INSTANCE & SETS BUFFER-VECTOR and POSITION-SIZE
 ;;;     -- all other slots set by POINT-OUTPUT-BUFFER
 (defun new-linear-output-buffer (&optional
-				   (max-position-count **max-buffer-position-count**)
+				   (max-position-count **max-radix-buffer-position-count**)
 				   (pos-size **position-size**)
 				   (byte-size **byte-size**))
   (let ((linear-output-buffer
@@ -293,7 +295,7 @@
 ;;; TODO -- detect when ht is full -- then special handle
 (defun load-hash-table-from-file (file-pathname)
   (loop with inbuff = (new-input-buffer file-pathname)
-     with large-ht = **large-hash-table**    ;; assume already cleard ??
+     with large-ht = **large-hash-table**    ;; assume already cleared ??
      for pos = (get-front-position inbuff) then (next-position inbuff)
      while pos
      do
@@ -301,7 +303,7 @@
 	 (setf (gethash (replace (new-reusable-position) pos)  ;; copy pos to use as key
 			large-ht)
 	       t))
-     finally`
+     finally
        (close-buffer inbuff)))
 
 ;; This removes all positions of file-pathname from the large-hash-table
@@ -324,8 +326,9 @@
        (write-position lin-outbuff pos)
      finally
        (close-buffer lin-outbuff)
-       (clrhash **large-hash-table**)))
-       
+       (clrhash **large-hash-table**)
+       (setf **next-free-position-in-large-vector** 0)  ;; reuse all positions
+       ))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; File Utilities
@@ -389,7 +392,16 @@
 (defun bucket-exists? (g h)
   ;; now check for any file with any radix satisfying g & h
   (and (array-in-bounds-p **open** g h)
-       (all-bucket-files? g h nil nil)))
+       (all-bucket-files? g h)))
+
+(defun empty-bucket? (g h)
+  (cond ((not (array-in-bounds-p **open** g h))
+	 t)
+	(t ;; return t if all raw and and non-raw radix-files are empty
+	 (loop for bucket-filepath in (all-bucket-files? g h)
+	    always
+	      (zerop (get-file-size bucket-filepath))))))
+
 
 ;; kludge -- use directory to search for any files in bucket
 (defun all-bucket-files? (g h)        ;; raw or not, any radix
@@ -553,13 +565,17 @@ ratio))
      for raw-pathname = (bucket-radix-pathname g-min h-max radix t)  ;; T = add-raw
      for prior-g-pathname = (bucket-radix-pathname (1- g-min) h-max radix nil)  ;; NOT RAW
      for prior-2-g-pathname = (bucket-radix-pathname (- g-min 2) h-max radix nil)  ;; NOT RAW
+     when (probe-file raw-pathname)
      do
        (load-hash-table-from-file raw-pathname)    ;; TODO: generalize so can load/filter in stages
        (when (probe-file prior-g-pathname)
 	 (filter-hash-table-with-file prior-g-pathname))
        (when (probe-file prior-2-g-pathname)
 	 (filter-hash-table-with-file prior-2-g-pathname))
-       (write-hash-table-to-radix-bucket g-min h-max radix)))
+       (write-hash-table-to-radix-bucket g-min h-max radix)
+       (when nil
+	 (print (list 'radix radix 'open-files (length (open-file-streams)))))))
+
 
 
 
@@ -568,21 +584,22 @@ ratio))
 ;;;   Repoints A0, A1, and A2 (using **out-buff-0** **out-buff-1** **out-buff-2**)
 ;;;     to 
 
-(defun expand-bucket (g h)
-  (loop with output-object = (list h
+(defun expand-bucket (g-min h-max)
+  (loop with output-object = (list h-max
 				   (get-bucket-out (1+ g-min) (1- h-max) **out-buff-0**)   ;; A0
-				   (get-bucket-out (1+ g-min) (1- h-max) **out-buff-1**)   ;; A1
+				   (get-bucket-out (1+ g-min) h-max **out-buff-1**)        ;; A1
 				   (get-bucket-out (1+ g-min) (1+ h-max) **out-buff-2**)   ;; A2
 				   )
      for radix from 0 below 256
-     for bucket-radix-pathname = (bucket-radix-pathname g h radix nil)   ;; expand only non-raw file
+     for bucket-radix-pathname = (bucket-radix-pathname g-min h-max radix nil)   ;; expand only non-raw file
      when (probe-file bucket-radix-pathname)
      do
-       (expand-radix-bucket g h radix output-object)   ;; output-object same for all radix vals
+       (expand-radix-bucket g-min h-max radix output-object)   ;; output-object same for all radix vals
      finally
      ;; Close-buffers A0, A1, A2
        (loop for out-buff in (cdr output-object)
-	    when out-buff
+	  when out-buff
+	  do
 	    (close-buffer out-buff))))
 
 
@@ -591,7 +608,7 @@ ratio))
     (print 'output-object) 
     (princ output-object))
   (loop with sol-pos? = nil
-     with in-buff = (get-bucket-in g-min h-max)
+     with in-buff = (get-bucket-in g-min h-max radix nil)     ;; only expand non-raw file
      for pos = (when in-buff (front-position in-buff)) then (next-position in-buff)
      while (and pos
 		(not **solution**))
@@ -617,10 +634,36 @@ ratio))
     (point-radix-output-buffer out-buff-to-repoint g h)))
 
 
-(defun get-bucket-in (g h radix)
-  (when (bucket-exists? g h)
-    (new-input-buffer (bucket-pathname g h)))
-  )
+(defun get-bucket-in (g h radix raw?)   ;; only call when corresponding bucket file exists!
+  (new-input-buffer (bucket-radix-pathname g h radix raw?)))
 
-  )
+
+;;; STORE INITIAL BUCKET (only done once when starting search)
+;; only called to store initial-position (should start new bucket)
+(defun store-bucket (position g h)   ;; NOTE: doesn't check for array-in-bounds-p (assumed ok)
+  (let ((out-buff (point-radix-output-buffer **out-buff-0** g h)))
+    (write-position out-buff position)
+    (close-buffer out-buff)))
+
+(defun init-out-buffs ()
+  (setf **out-buff-0**
+	(init-radix-out-buff **out-buff-0**))
+  (setf **out-buff-1**
+	(init-radix-out-buff **out-buff-1**))
+  (setf **out-buff-2**
+	(init-radix-out-buff **out-buff-2**)))
+
+(defun init-radix-out-buff (out-buff)
+  (cond ((and nil       ;; for now, never ok to re-use
+	      out-buff
+	      ; (= (length (buffer-vector out-buff))
+					;    max-position-count)
+	      )
+	 #|
+	 (unless (pos-type-ok? (aref (buffer-vector out-buff) 0))
+	   (fill (buffer-vector out-buff) nil))
+	 |#
+	 out-buff)  ;; return the out-buff
+	(t    ;; can't re-use so create-new output-buffer
+	 (new-radix-output-buffer))))
 

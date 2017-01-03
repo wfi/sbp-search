@@ -6,6 +6,7 @@
 (load "Ext-AStar-code-from-file-search-engine")
 (load "Ext-AStar-file-based-SBP")
 (load "SBP-Ext-AStar-blank-index-jimslide")
+(load "radix-file-buffers")
 (load "slide-puzzle-inits")
 
 

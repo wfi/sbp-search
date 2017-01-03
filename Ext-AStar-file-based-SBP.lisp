@@ -92,6 +92,7 @@ Procedure External A*
 			  (solved?-fun **solved?-fun**)
 			  (successors-fun **successors-fun**))
   (init-out-buffs)  ;; sets up 3 out-buffs (**out-buff-0** **out-buff-1** **out-buff-2**)
+  (setup-large-hash-table)
   (setf **solution** nil)
   (setf **max-g** g-bound)
   (setf **max-h** h-bound)
@@ -191,8 +192,18 @@ Procedure External A*
 ;;;   This now triggers the merge before expanding
 
 (defun merge-and-expand-bucket (g-min h-max)
-  (merge-segments g-min h-max) ;; Merge / filter bucket before expanding (check if merge-file exists)
-  (expand-bucket g-min h-max))
+  (merge-bucket g-min h-max) ;; Merge / filter bucket before expanding (check if merge-file exists)
+  (when nil
+    (format t "~%Merged bucket g=~a h=~a"
+	    g-min h-max)
+    (format t "~%Open file count: ~a"
+	    (length (open-file-streams))))
+  (expand-bucket g-min h-max)
+  (when nil
+    (format t "~%Expanded bucket g=~a h=~a"
+	    g-min h-max)
+    (format t "~%Open file count: ~a"
+	    (length (open-file-streams)))))
 
 ;;; Merge and Expand moved to another file to isolate different implementations
 
@@ -268,25 +279,7 @@ Procedure External A*
   |#
   )
 
-#|
-;; only called to store initial-position (should start new bucket)
-(defun store-bucket (position g h)   ;; NOTE: doesn't check for array-in-bounds-p (assumed ok)
-  (let ((out-buff (point-output-buffer **out-buff-0** g h nil)))   ;; nil for "No Segments"
-    (write-position out-buff position)
-    (close-buffer out-buff)))
-|#
 
-(defun empty-bucket? (g h)
-  (cond ((not (array-in-bounds-p **open** g h))
-	 t)
-	(t ;; return t if both bucket and segments empty
-	 (and (let ((bucket-filepath (bucket-pathname g h))) ;; let checks if bucket file empty
-		(or (not (probe-file bucket-filepath)) ;; file doesn't exist
-		    (zerop (get-file-size bucket-filepath)))) ;; file exists but is empty
-	      (loop for seg-num from 1 ;; T if there is some segment that is NOT empty
-		 for bucket-seg-path = (bucket-segment-pathname g h seg-num)
-		 while (probe-file bucket-seg-path)
-		 always (zerop (get-file-size bucket-seg-path)))))))
 
 
 #|

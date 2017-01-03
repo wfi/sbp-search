@@ -487,6 +487,7 @@ ratio))
 (defparameter **out-buff-1** nil)
 (defparameter **out-buff-2** nil)
 
+#|
 (defun init-out-buffs (&optional (max-position-count **max-buffer-position-count**))
   (setf **out-buff-0**
 	(init-out-buff **out-buff-0** max-position-count))
@@ -510,6 +511,7 @@ ratio))
        (= (length pos) **position-size**)
        (equal (array-element-type pos)
 	      (list 'unsigned-byte **byte-size**))))
+|#
        
 
 ;; moved earlier to avoid compiler error
@@ -519,6 +521,7 @@ ratio))
 ;;; NEVER RE-USE buffer-vector - only use NEW-OUTPUT-BUFFER for init
 ;;;   NOW ONLY MAKES INSTANCE & SETS BUFFER-VECTOR
 ;;;     -- all other slots set by POINT-OUTPUT-BUFFER
+#|
 (defun new-output-buffer (&optional 
 			    (max-position-count **max-buffer-position-count**))
   (let ((output-buffer
@@ -558,10 +561,6 @@ ratio))
     out-buff ;; return the output-buffer !!  (so can use for value, not just side-effect)
     ))
       
-
-
-
-
 
 (defmethod write-position ((outbuff output-buffer) position)
   ; write-position copies position into position-element in buffer-vector - if buffer full will flush to file and update
@@ -641,6 +640,7 @@ ratio))
       (store-open-info bucket-g bucket-h :segment-count segment-count))
     (close output-buffer-file-stream)))
 
+|#
     
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -853,6 +853,8 @@ ratio))
        (print pos)
        (fancy-display-compressed-position pos)   ;; this uncompresses pos
        (format t "~%  H-value = ~a" (t-piece-h-fun))  ;; this uses intermediate-position info
+     finally
+       (close inbuff)
        ))
 
 
