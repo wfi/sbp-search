@@ -93,9 +93,9 @@
 ;;; GLOBALS
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-(defparameter **open** nil)
+;(defparameter **open** nil)
 
-(defparameter **candidate-position-register** nil) ;; allocated later based on **position-size**
+;(defparameter **candidate-position-register** nil) ;; allocated later based on **position-size**
 
 (defparameter  **compressed-solution-sequence** nil)  ;; for holding list of byte-positions in recovered solution
 
@@ -157,6 +157,7 @@
 
 ;;; Position Comparison
 
+#|
 ;; predicate
 (defun compare-positions-for-sort (pos1 pos2)  ;; assumes both pos1 and pos2 are byte-sequence positions
   (loop for byte1 across pos1
@@ -176,17 +177,20 @@
                ((= byte1 byte2)   0)   ;; =
                (t   1)                 ;; >
                ))))
+|#
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; File Utilities
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
+#|
 (defparameter **path-to-file-storage**
   ;"/Users/glenniba/temp/SEARCH-FILE-STORAGE/"
   ; /Volumes/EXT1-OTHER/SEARCH-FILE-STORAGE/"
   "/Volumes/EXT-3TB-B/SEARCH-FILE-STORAGE/"
   ; "/Volumes/Seagate6TB/SEARCH-FILE-STORAGE/"
   )
+
 
 ;; convenience function
 ;;   Note: can "manually set directory" with SET-DIR
@@ -204,6 +208,7 @@
 
 (defun file-storage-pathname (local-path-string)
   (format nil "~a~a" **path-to-file-storage** local-path-string))
+
 
 ;; was fringe-pathname
 (defun bucket-pathname (g h)
@@ -269,14 +274,13 @@
 
 ;; won't work if files get deleted  -- maybe use **open** data for this ?
 ;;  need to re-work for 2-d open array ??
-#|
+
 (defun display-bucket-sizes (&optional (start-depth 0))
   (loop for depth from start-depth
         for fringe-path = (fringe-pathname depth)
         while (probe-file fringe-path)
         do
         (print (list depth (get-fringe-position-size depth)))))
-|#
 
 ;; was  format-file-info-for-depth
 (defun format-file-info-for-bucket (g h)
@@ -294,7 +298,6 @@
             bucket-positions
             ratio)))
 
-#|
   (loop for depth from 0 to 104
 for generated-positions = (/ (sum-fringe-segment-byte-sizes depth) **position-size**)
 for fringe-positions = (get-fringe-position-size depth)
@@ -307,9 +310,7 @@ depth
 generated-positions
 fringe-positions
 ratio))
-  |#
 
-#|
 ;; was delete-fringe-segments
 (defun delete-bucket-segments (g h)
   (loop for segnum from 1
@@ -469,6 +470,7 @@ ratio))
 ;;;  OUTPUT BUFFER 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
+#|
 (defclass output-buffer ()
   (; (position-size :initform nil :accessor position-size)  ;; needed for allocating new positions?  (or simply copy-seq the position being written)
    (buffer-size :initform nil :accessor buffer-size)    ; in positions (will hold byte-position vectors/sequences)
@@ -487,7 +489,6 @@ ratio))
 (defparameter **out-buff-1** nil)
 (defparameter **out-buff-2** nil)
 
-#|
 (defun init-out-buffs (&optional (max-position-count **max-buffer-position-count**))
   (setf **out-buff-0**
 	(init-out-buff **out-buff-0** max-position-count))
@@ -778,7 +779,7 @@ ratio))
 	  (close-buffer inbuff))
        (close-buffer output-buffer)
        )))
-|#
+
 
 (defun collect-prior-buckets (g h)
   (loop with least-depth-prior-fringe = (- g 2)  ;; look at previous 2 buckets with same h
@@ -838,7 +839,7 @@ ratio))
         ((compare-positions-for-sort pos1 pos2)
          pos1)       ;; choose pos1 if strictly less than pos2
         (t pos2)))   ;;  otherwise pos2, works even if positions are equal
-
+|#
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; DEBUG FILES UTILITY
@@ -978,7 +979,7 @@ ratio))
 ;;; ITERFACE FUNCTIONS TO HEAP - FOR MERGING
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-
+#|
 ;;; MACROS need to be defined before referenced
 
 ;; macro so will be setf-able
@@ -1002,7 +1003,6 @@ ratio))
 
 (defmacro right (i)   ;; right child node index
   `(1+ (* 2 ,i)))
-
 
 ;;;;;;;;;;;;;;;;
 ;;;;; Interface functions (between search and heap implementation):
@@ -1038,6 +1038,8 @@ ratio))
 	      (heapify **heap** 1))
 	     (t    ;; max-inbuff IS empty!  So remove it from heap
 	      (heap-extract-max **heap**)))))
+|#
+
 
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -1059,6 +1061,7 @@ ratio))
 ;;;     Heap-size  = number of elements stored in Heap  (<= Length)
 ;;;        [Hack: Store the heap-size on Array[0]
 
+#|
 (defun create-empty-heap (max-size)
   (let ((heap (make-array (1+ max-size))))
     (setf (aref heap 0) 0)   ;; heap is empty, i.e. 0 elements
@@ -1067,7 +1070,7 @@ ratio))
 (defun heap-length (heap)
   (1- (length heap)))   ;;; index of last position in array
   
-#|
+
 ;;; MOVED EARLIER AND CHANGED TO MACROS	;
 
 ;;;   Node indexing:			;
@@ -1134,6 +1137,7 @@ do
 ;;; PRIORITY QUEUE (FROM HEAP)
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
+#|
 ;;;   Set of Elements S
 ;;;   Each element has a KEY
 ;;;   Operations:
@@ -1178,7 +1182,7 @@ do
 (defun heap-compare? (inbuff1 inbuff2)  ;; two heap entries (input-buffers)
   (compare-positions-for-sort (get-front-position inbuff1) (get-front-position inbuff2))
   )
-
+|#
 
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;

@@ -513,7 +513,7 @@ Procedure External A*
   ;; Set candidate-position-register for use by merge-segments
   (setf **candidate-position-register**
         (make-byte-vector **position-size**))
-  (setf **heap** (create-empty-heap 8200)) ;; 2000 input buffers should suffice for a while, but maybe needs larger later (2-28-2016 do need more for climb15a with buff=50000)
+  ;(setf **heap** (create-empty-heap 8200)) ;; 2000 input buffers should suffice for a while, but maybe needs larger later (2-28-2016 do need more for climb15a with buff=50000)
   ;; check **free-input-buffers** to see if position-size is ok
   (let ((first-inbuff (aref **free-input-buffers** 0)))
     (when (and first-inbuff

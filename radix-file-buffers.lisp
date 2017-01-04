@@ -74,9 +74,9 @@
 (defvar **position-size**)
 (defvar **byte-size**)
 
-(defvar **out-buff-0**)
-(defvar **out-buff-1**)
-(defvar **out-buff-2**)
+(defparameter **out-buff-0** nil)
+(defparameter **out-buff-1** nil)
+(defparameter **out-buff-2** nil)
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; RADIX OUTPUT BUFFER
@@ -389,10 +389,12 @@
 
 ;; was fringe-exists?
 ;; TODO: Rewrite for RADIX
+#|
 (defun bucket-exists? (g h)
   ;; now check for any file with any radix satisfying g & h
   (and (array-in-bounds-p **open** g h)
        (all-bucket-files? g h)))
+|#
 
 (defun empty-bucket? (g h)
   (cond ((not (array-in-bounds-p **open** g h))
