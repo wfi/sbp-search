@@ -78,6 +78,9 @@
 (defparameter **out-buff-1** nil)
 (defparameter **out-buff-2** nil)
 
+;;; Used for quick check if bucket is empty (Must be updated when bucket is written to)
+(defparameter **empty-bucket** nil)   ;; also defparameter for this in Ext-AStar-file-based-SBP file
+
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; RADIX OUTPUT BUFFER
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -216,15 +219,20 @@
     ))
 
 ;;; NOTE: this no longer SORTS buffer before write, but rather appends
+;;; NOTE2: This should ONLY be called when there is something to WRITE,
+;;;     Since it now updates **empty-bucket** when called
 (defmethod write-buffer-vector-to-output-stream ((lin-outbuff linear-output-buffer))
   ;;  will only write from 0 to fill-pointer
-  (with-slots (buffer-vector output-filepath output-buffer-file-stream)
+  (with-slots (buffer-vector output-filepath output-buffer-file-stream bucket-g bucket-h)
       lin-outbuff
     ;;(start-timing 'reduce-write-buffer)
     (unless output-buffer-file-stream
       (setf output-buffer-file-stream
 	    (open-output-file-stream output-filepath)))
     (write-sequence buffer-vector output-buffer-file-stream)
+    ;;; Update **empty-bucket** (no longer empty)
+    (setf (aref **empty-bucket** bucket-g bucket-h)
+	  nil)     ;; NOT EMPTY any more
     ;;(stop-timing 'reduce-write-buffer)
     )
   ;; Does NOT close or update, since may want to keep appending to outstream
@@ -396,7 +404,15 @@
        (all-bucket-files? g h)))
 |#
 
+
+;; Maybe make this a Macro -- but first verify that it works!
 (defun empty-bucket? (g h)
+  (or (not (array-in-bounds-p **open** g h))
+      (aref **empty-bucket** g h))   ;; Must update this array when there is output to a bucket
+  )
+
+;;; This uses PROBE-FILE instead of DIRECTORY
+(defun empty-bucket-probe? (g h)
   (cond ((not (array-in-bounds-p **open** g h))
 	 t)
 	(t ;; return t if all raw and and non-raw radix-files are empty

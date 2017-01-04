@@ -50,6 +50,7 @@ Procedure External A*
 
 
 (defparameter **open** nil)
+(defparameter **empty-bucket** nil)
 (defparameter **solution** nil)
 (defparameter **open-delete-counts** nil)
 (defparameter **open-create-sizes** nil)
@@ -116,6 +117,8 @@ Procedure External A*
   (start-timing 'elapsed-time)
   (loop with open = (make-array (list (1+ g-bound) (1+ h-bound))
 				:initial-element nil)
+       with empty-bucket-array = (make-array (list (1+ g-bound) (1+ h-bound))
+					     :initial-element T)   ;; initially all buckets empty
      with init-h-val = (funcall h-fun initial-position)
      with f-max = (+ g-bound h-bound) ;; max-f for open array at g-bound, h-bound  (was -2 before)
      with f-min = init-h-val
@@ -123,6 +126,7 @@ Procedure External A*
      with h-max = nil
      initially
        (setf **open** open) ;; make available for debugging
+       (setf **empty-bucket** empty-bucket-array)
        (setf **open-delete-counts**
 	     (make-array (array-dimensions open) :initial-element 0))
        (setf **open-create-sizes**
@@ -210,6 +214,7 @@ Procedure External A*
 
 ;;;; OPEN BUCKET INFO
 
+#|
 (defun new-open-info-record ()
   (list :record? t))   ;; to guarantee never empty (so can store by nconc)
 
@@ -228,6 +233,7 @@ Procedure External A*
     (if segment-count?
 	(1+ segment-count?)
 	1)))
+|#
 
 ;; basic record functions
 
