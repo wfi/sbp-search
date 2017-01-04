@@ -400,15 +400,17 @@
   (cond ((not (array-in-bounds-p **open** g h))
 	 t)
 	(t ;; return t if all raw and and non-raw radix-files are empty
-	 (loop for bucket-filepath in (all-bucket-files? g h)
-	    always
-	      (zerop (get-file-size bucket-filepath))))))
+	 (loop for radix from 0 below 256    ;; TODO: Generalize for **radix-count** or **radix-bits**
+	    never   ;; assuming NEVER write out empty files !!  CAREFUL!!
+	      (or (probe-file (bucket-radix-pathname g h radix nil))
+		  (probe-file (bucket-radix-pathname g h radix t)))))))
 
-
+#|
 ;; kludge -- use directory to search for any files in bucket
 (defun all-bucket-files? (g h)        ;; raw or not, any radix
   (directory (wild-card-bucket-pathname g h)))
 
+;; not called ?
 (defun all-raw-bucket-files? (g h)
   (directory (wild-card-bucket-pathname-raw g h)))
 
@@ -432,6 +434,7 @@
 (defun bucket-segment-exists? (g h segment-number)
   (probe-file (bucket-segment-pathname g h segment-number)))
 
+
 ;; was sum-fringe-segment-byte-sizes
 (defun sum-bucket-segment-byte-sizes (g h)
   (loop for seg-num from 1
@@ -444,6 +447,8 @@
         while (bucket-segment-exists? g h seg-num)
         sum
         (get-file-position-size (bucket-segment-pathname g h seg-num))))
+
+|#
 
 (defun open-input-file-stream (pathname)
   (open  pathname
@@ -459,6 +464,7 @@
         :if-does-not-exist :create
         :if-exists :append))    ;; no longer :error or :supersede for radix files
 
+;; NEED THIS
 (defun get-file-size (pathname)   ;; size in bytes
   (with-open-file (infile pathname :direction :input :if-does-not-exist :error)
     (file-length infile)))
@@ -467,9 +473,11 @@
   (/ (get-file-size pathname)
      **final-8bit-byte-position-size**))
 
+#|
 ;; was get-fringe-byte-size
 (defun get-bucket-byte-size (g h)
   (get-file-size (bucket-pathname g h)))
+
 
 ;; was get-fringe-position-size
 (defun get-bucket-position-size (g h &optional (pos-size **final-8bit-byte-position-size**)) ;; 8bit bytes
@@ -479,7 +487,7 @@
 
 ;; won't work if files get deleted  -- maybe use **open** data for this ?
 ;;  need to re-work for 2-d open array ??
-#|
+
 (defun display-bucket-sizes (&optional (start-depth 0))
   (loop for depth from start-depth
         for fringe-path = (fringe-pathname depth)
@@ -489,6 +497,7 @@
 |#
 
 ;; was  format-file-info-for-depth
+#|
 (defun format-file-info-for-bucket (g h)
   (let* ((generated-positions
 	  (/ (sum-bucket-segment-byte-sizes g h)   ;; won't work after segments deleted
@@ -503,6 +512,7 @@
             generated-positions
             bucket-positions
             ratio)))
+|#
 
 #|
   (loop for depth from 0 to 104
