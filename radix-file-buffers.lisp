@@ -407,11 +407,12 @@
 
 ;; Maybe make this a Macro -- but first verify that it works!
 (defun empty-bucket? (g h)
-  (or (not (array-in-bounds-p **open** g h))
-      (aref **empty-bucket** g h))   ;; Must update this array when there is output to a bucket
-  )
+  (or (not (array-in-bounds-p **empty-bucket** g h))
+      (aref **empty-bucket** g h)))   ;; Must update this array when there is output to a bucket
+
 
 ;;; This uses PROBE-FILE instead of DIRECTORY
+#|
 (defun empty-bucket-probe? (g h)
   (cond ((not (array-in-bounds-p **open** g h))
 	 t)
@@ -420,6 +421,7 @@
 	    never   ;; assuming NEVER write out empty files !!  CAREFUL!!
 	      (or (probe-file (bucket-radix-pathname g h radix nil))
 		  (probe-file (bucket-radix-pathname g h radix t)))))))
+|#
 
 #|
 ;; kludge -- use directory to search for any files in bucket
@@ -589,20 +591,21 @@ ratio))
 
 
 (defun merge-bucket (g-min h-max)
-  (loop for radix from 0 below 256    ;; generalize to Radix-count (using radix-bit-count ?)
-     for raw-pathname = (bucket-radix-pathname g-min h-max radix t)  ;; T = add-raw
+  (loop for radix from 0 below 256 ;; generalize to Radix-count (using radix-bit-count ?)
+     for raw-pathname = (bucket-radix-pathname g-min h-max radix t) ;; T = add-raw
      for prior-g-pathname = (bucket-radix-pathname (1- g-min) h-max radix nil)  ;; NOT RAW
      for prior-2-g-pathname = (bucket-radix-pathname (- g-min 2) h-max radix nil)  ;; NOT RAW
      when (probe-file raw-pathname)
      do
-       (load-hash-table-from-file raw-pathname)    ;; TODO: generalize so can load/filter in stages
+       (load-hash-table-from-file raw-pathname)	;; TODO: generalize so can load/filter in stages
        (when (probe-file prior-g-pathname)
 	 (filter-hash-table-with-file prior-g-pathname))
        (when (probe-file prior-2-g-pathname)
 	 (filter-hash-table-with-file prior-2-g-pathname))
        (write-hash-table-to-radix-bucket g-min h-max radix)
-       (when nil
-	 (print (list 'radix radix 'open-files (length (open-file-streams)))))))
+     ;; (when nil
+     ;;    (print (list 'radix radix 'open-files (length (open-file-streams)))))
+       ))
 
 
 
