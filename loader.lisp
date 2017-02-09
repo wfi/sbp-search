@@ -10,6 +10,13 @@
 (load "slide-puzzle-inits")
 
 
-(defparameter **path-to-file-storage** "/Volumes/EXT-3TB-B/SEARCH-FILE-STORAGE/")
-(defparameter **max-buffer-position-count** 5000000)
+;; CONFIG
+
+;; Glenn - MacBookPro
+; (defparameter **path-to-file-storage** "/Volumes/EXT-3TB-B/SEARCH-FILE-STORAGE/")
+; (defparameter **max-buffer-position-count** 5000000)
+
+;; Glenn - Hackintosh
+(defparameter **path-to-file-storage** "/Volumes/Seagate6TB/SEARCH-FILE-STORAGE/")
+(defparameter **max-buffer-position-count** 5000000)  ;; enlarge ??
 
