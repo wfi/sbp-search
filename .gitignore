@@ -1,6 +1,5 @@
 # Sliding-Block Puzzle Files
-loader.lisp
-
+storage
 
 # Emacs or Racket backup files
 *~
