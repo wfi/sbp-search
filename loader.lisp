@@ -4,6 +4,6 @@
 (load "SBP-Ext-AStar-blank-index-jimslide")
 (load "slide-puzzle-inits")
 
-
-(defparameter **path-to-file-storage** "./storage/")
-(defparameter **max-buffer-position-count** 5000000)
+(load "local-config.lisp") ;; NOT tracked by git, but containing local values
+;(defparameter **path-to-file-storage** "./storage/")
+;(defparameter **max-buffer-position-count** 5000000)
