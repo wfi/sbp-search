@@ -271,6 +271,8 @@
 				 (position-count **large-hash-table-size**)
 				 (position-size **position-size**)
 				 (byte-size **byte-size**))
+  (format t "~% Setting **large-hash-table-size** to hold ~a positions"
+	  position-count)
   (print (list position-count position-size byte-size))
   (setf **large-hash-table-size** position-count)
   (setf **large-hash-table**
