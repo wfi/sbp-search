@@ -196,13 +196,19 @@ Procedure External A*
 ;;;   This now triggers the merge before expanding
 
 (defun merge-and-expand-bucket (g-min h-max)
+  (reset-timer 'reduce-bucket)
+  (start-timing 'reduce-bucket)
   (merge-bucket g-min h-max) ;; Merge / filter bucket before expanding (check if merge-file exists)
+  (stop-timing 'reduce-bucket)
   (when nil
     (format t "~%Merged bucket g=~a h=~a"
 	    g-min h-max)
     (format t "~%Open file count: ~a"
 	    (length (open-file-streams))))
+  (reset-timer 'expand-bucket)
+  (start-timing 'expand-bucket)
   (expand-bucket g-min h-max)
+  (stop-timing 'expand-bucket)
   (when nil
     (format t "~%Expanded bucket g=~a h=~a"
 	    g-min h-max)
@@ -542,17 +548,23 @@ Procedure External A*
   ;; setup timers
   (loop for timer-name in '(ELAPSED-TIME
 			    ;; GENERATE-FRINGE  -- maybe time F-MIN diagonal ??
-			    EXPAND 
-			    EXPAND-SORT-BUFFER
-			    EXPAND-WRITE-BUFFER
-			    REDUCE
-			    REDUCE-WRITE-BUFFER)
+			    EXPAND-BUCKET
+			    ;; EXPAND-SORT-BUFFER
+			    ;; EXPAND-WRITE-BUFFER
+			    REDUCE-BUCKET
+			    ;; REDUCE-WRITE-BUFFER
+			    )
        do
        (allow-timing timer-name)
        (reset-timer timer-name))   ;; now does reset  (since start-timing doesn't reset accumulator)
   ;; setup counters
   (allow-counting 'all-successors)
   (allow-counting 'expanded-positions)
+  (allow-counting 'bucket-successors)
+  (allow-counting 'bucket-expanded-positions)
+  (allow-counting 'successor-same-radix)
+  (allow-counting 'successor-same-h-val)
+  (allow-counting 'successor-same-radix-and-same-h-val)
   ;; reset counters
   (reset-counter 'all-successors)
   (reset-counter 'expanded-positions)

@@ -144,6 +144,13 @@
        do
 	 (close-buffer lin-outbuff))))
 
+;; inefficient -- only use when needed for data collection
+(defun get-position-radix-val (position
+			       &optional
+				 (radix-mask 255)
+				 (position-index-for-radix (1- **position-size**)))
+  (logand radix-mask
+	  (aref position position-index-for-radix)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; LINEAR OUTPUT BUFFER 
@@ -593,17 +600,26 @@ ratio))
 
 
 (defun merge-bucket (g-min h-max)
-  (loop for radix from 0 below 256 ;; generalize to Radix-count (using radix-bit-count ?)
+  (loop with duplicate-elim-data = nil
+     for radix from 0 below 256 ;; generalize to Radix-count (using radix-bit-count ?)
      for raw-pathname = (bucket-radix-pathname g-min h-max radix t) ;; T = add-raw
      for prior-g-pathname = (bucket-radix-pathname (1- g-min) h-max radix nil)  ;; NOT RAW
      for prior-2-g-pathname = (bucket-radix-pathname (- g-min 2) h-max radix nil)  ;; NOT RAW
      when (probe-file raw-pathname)
      do
+       (setf duplicate-elim-data (list (get-file-position-size raw-pathname)))
        (load-hash-table-from-file raw-pathname)	;; TODO: generalize so can load/filter in stages
+       (push (hash-table-count **large-hash-table**)
+	     duplicate-elim-data)
        (when (probe-file prior-g-pathname)
 	 (filter-hash-table-with-file prior-g-pathname))
+       (push (hash-table-count **large-hash-table**)
+	     duplicate-elim-data)
        (when (probe-file prior-2-g-pathname)
 	 (filter-hash-table-with-file prior-2-g-pathname))
+       (push (hash-table-count **large-hash-table**)
+	     duplicate-elim-data)
+       (format t "~%Radix ~a dup-elim: ~a" radix duplicate-elim-data)
        (write-hash-table-to-radix-bucket g-min h-max radix)
      ;; (when nil
      ;;    (print (list 'radix radix 'open-files (length (open-file-streams)))))
@@ -618,6 +634,11 @@ ratio))
 ;;;     to 
 
 (defun expand-bucket (g-min h-max)
+  (reset-counter 'bucket-successors)
+  (reset-counter 'bucket-expanded-positions)
+  (reset-counter 'successor-same-radix)
+  (reset-counter 'successor-same-h-val)
+  (reset-counter 'successor-same-radix-and-same-h-val)
   (loop with output-object = (list h-max
 				   (get-bucket-out (1+ g-min) (1- h-max) **out-buff-0**)   ;; A0
 				   (get-bucket-out (1+ g-min) h-max **out-buff-1**)        ;; A1
@@ -651,7 +672,7 @@ ratio))
        (when **debug**
 	 (print 'generating-successors-of-pos)
 	 (princ pos))
-       (setf sol-pos? (generate-successors pos output-object))
+       (setf sol-pos? (generate-successors pos output-object **check-solved?** radix))
 					;(print 'after-calling-generate-successors)
        (when sol-pos?
 	 (setf  **solution** (list sol-pos? (1+ g-min)))

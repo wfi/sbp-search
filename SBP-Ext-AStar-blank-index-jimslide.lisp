@@ -413,9 +413,14 @@
 
 ;;; For Ext-AStar-SBP, output-buffer = (h-max A0 A1 A2) where Ai are hash-tables
 ;;;    h-value computed from **intermediate-position** and used to select Ai for storing position
-(defun generate-successors (position output-buffer &optional (check-solved? **check-solved?**))
+(defun generate-successors (position output-buffer
+			    &optional
+			      (check-solved? **check-solved?**)
+			      (position-radix (get-position-radix-val position)))
   ;; position is expected to be a byte-position in register:  **sbp-position-register**
   ;; OOPS - its not in that register!  [it's actually a front-position of an input buffer - better not modify it!]
+  ;; count expanded-position
+  (inc-counter 'bucket-expanded-positions)
   ;; uncompress position
   (jimslide-uncompress position) ;; target is **intermediate-position** and **intermediate-blank-index**
   (loop ; with source-blank-index = (extract-index-from-byte-seq position) ; now **intermediate-blank-index**
@@ -444,16 +449,26 @@
 	       ;; (print "SUCCESSOR:")
 	       ;; (fancy-display-compressed-position **sbp-position-register**)
 		 ;; (write-position output-buffer **sbp-position-register**)
-		 (let ((succ-h (t-piece-h-fun new-blanks-index
+		 (let* ((succ-h (t-piece-h-fun new-blanks-index
 					      **intermediate-position**))
-		       (succ-pos **sbp-position-register**))  ;; don't need to copy with write-to-file
+			(succ-pos **sbp-position-register**)  ;; don't need to copy with write-to-file
+			(succ-radix (get-position-radix-val succ-pos)))
 		   (case (- succ-h h-max) ;; 1 when fmin+2, 0 when fmin+1, -1 when fmin
 		     (1 (write-position A2 succ-pos))
 		     (0 (write-position A1 succ-pos))
 		     (-1 (write-position A0 succ-pos))
 		     (t (error "case val ~a wasn't 1,0,or-1" (- succ-h h-max))))
+		   ;; record data on same-h and same-radix
+		   (cond ((= succ-h h-max)
+			  (inc-counter 'successor-same-h-val)
+			  (when (= succ-radix position-radix)
+			    (inc-counter 'successor-same-radix)
+			    (inc-counter 'successor-same-radix-and-same-h-val)))
+			 ((= succ-radix position-radix)
+			  (inc-counter 'successor-same-radix)))
 		   )
 		 (inc-counter 'all-successors)
+		 (inc-counter 'bucket-successors)
 		 (when **debug**
 		   (format t "~% called (inc-counter 'all-successors) new count = ~a"
 			   (get-counter 'all-successors)))
