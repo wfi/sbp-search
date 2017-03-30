@@ -335,12 +335,25 @@
        (close-buffer inbuff)))
 
 ;; Should this always clear the hash-table when done writing ?
-(defun write-hash-table-to-radix-bucket (g h radix)
+(defun write-hash-table-to-radix-bucket (g h radix
+					 &optional
+					   expand-positions?) ;; nil or output-object
   (point-linear-output-buffer **ht-linear-output-buffer** g h radix nil)    ;; raw? = nil to write to <bucket>.data
+  ;;; For interleaved expand
+  (when expand-positions?
+    ;; reset counters
+    (reset-counter 'bucket-successors)
+    (reset-counter 'bucket-expanded-positions)
+    (reset-counter 'successor-same-radix)
+    (reset-counter 'successor-same-h-val)
+    (reset-counter 'successor-same-radix-and-same-h-val)
+    )
   (loop with lin-outbuff = **ht-linear-output-buffer**
      for pos being the hash-keys of **large-hash-table**
      do
        (write-position lin-outbuff pos)
+       (when expand-positions?
+	 (expand-position pos expand-positions? g radix))
      finally
        (close-buffer lin-outbuff)
        (clrhash **large-hash-table**)
@@ -598,31 +611,52 @@ ratio))
 ;;;          where g1 = g-1,  and g2 = g-2]
 ;;;    Then writes out the reduced hash-table to file bucket-g-h-radix-r.data
 
-
+;; NOW does BOTH MERGE and EXPAND
 (defun merge-bucket (g-min h-max)
   (loop with duplicate-elim-data = nil
+       with prior-bucket-sizes = nil
+     ;; output object for expand
+     with output-object = (list h-max
+				(get-bucket-out (1+ g-min) (1- h-max) **out-buff-0**)   ;; A0
+				(get-bucket-out (1+ g-min) h-max **out-buff-1**)        ;; A1
+				(get-bucket-out (1+ g-min) (1+ h-max) **out-buff-2**)   ;; A2
+				   )
      for radix from 0 below 256 ;; generalize to Radix-count (using radix-bit-count ?)
      for raw-pathname = (bucket-radix-pathname g-min h-max radix t) ;; T = add-raw
      for prior-g-pathname = (bucket-radix-pathname (1- g-min) h-max radix nil)  ;; NOT RAW
      for prior-2-g-pathname = (bucket-radix-pathname (- g-min 2) h-max radix nil)  ;; NOT RAW
      when (probe-file raw-pathname)
      do
-       (setf duplicate-elim-data (list (get-file-position-size raw-pathname)))
+       (setf duplicate-elim-data (list (get-file-position-size raw-pathname))
+	     prior-bucket-sizes nil)
        (load-hash-table-from-file raw-pathname)	;; TODO: generalize so can load/filter in stages
        (push (hash-table-count **large-hash-table**)
 	     duplicate-elim-data)
        (when (probe-file prior-g-pathname)
+	 (push (list :g-1 (get-file-position-size prior-g-pathname))
+	       prior-bucket-sizes)
 	 (filter-hash-table-with-file prior-g-pathname))
        (push (hash-table-count **large-hash-table**)
 	     duplicate-elim-data)
        (when (probe-file prior-2-g-pathname)
+	 (push (list :g-2 (get-file-position-size prior-2-g-pathname))
+	       prior-bucket-sizes)
 	 (filter-hash-table-with-file prior-2-g-pathname))
        (push (hash-table-count **large-hash-table**)
 	     duplicate-elim-data)
-       (format t "~%Radix ~a dup-elim: ~a" radix duplicate-elim-data)
-       (write-hash-table-to-radix-bucket g-min h-max radix)
+       (format t "~%Radix ~a dup-elim: ~a prior-sizes: ~a"
+	       radix
+	       duplicate-elim-data
+	       prior-bucket-sizes)
+       (write-hash-table-to-radix-bucket g-min h-max radix output-object)
      ;; (when nil
      ;;    (print (list 'radix radix 'open-files (length (open-file-streams)))))
+     finally
+     ;; Close-buffers A0, A1, A2
+       (loop for out-buff in (cdr output-object)
+	  when out-buff
+	  do
+	    (close-buffer out-buff))
        ))
 
 
@@ -633,6 +667,22 @@ ratio))
 ;;;   Repoints A0, A1, and A2 (using **out-buff-0** **out-buff-1** **out-buff-2**)
 ;;;     to 
 
+;;; Call from write-hash-table-to-radix-bucket
+;;;  Returns solution-position or NIL
+(defun expand-position (pos output-object g-min radix)
+  (inc-counter 'expanded-positions)
+  (let ((sol-pos? nil))
+    (setf sol-pos?
+	  (generate-successors pos output-object **check-solved?** radix))
+					;(print 'after-calling-generate-successors)
+    (when sol-pos?
+      (setf  **solution** (list sol-pos? (1+ g-min)))
+      (format t "~%FOUND SOLUTION WITH G-VAL = ~a" (1+ g-min)))
+    sol-pos?))
+
+
+
+;; Don't use (call expand-position in write-hash-table-to-radix-bucket )
 (defun expand-bucket (g-min h-max)
   (reset-counter 'bucket-successors)
   (reset-counter 'bucket-expanded-positions)
@@ -656,7 +706,6 @@ ratio))
 	  do
 	    (close-buffer out-buff))))
 
-
 (defun expand-radix-bucket (g-min h-max radix output-object)
   (when **debug**
     (print 'output-object) 
@@ -677,7 +726,6 @@ ratio))
        (when sol-pos?
 	 (setf  **solution** (list sol-pos? (1+ g-min)))
 	 (format t "~%FOUND SOLUTION WITH G-VAL = ~a" (1+ g-min)))
-
      finally
        (when in-buff
 	 (close-buffer in-buff))

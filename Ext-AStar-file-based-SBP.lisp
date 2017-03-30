@@ -109,6 +109,7 @@ Procedure External A*
 			  **final-8bit-byte-position-size**
 			  **puzzle-name**
 			  **puzzle-directory-name**
+			  **path-to-file-storage**
 			  **exper-tag**
 			  **moves-invertible?**
 			  **debug**
@@ -195,25 +196,15 @@ Procedure External A*
 ;;; EXPAND BUCKET
 ;;;   This now triggers the merge before expanding
 
+;;; MODIFIED to INTERLEAVE EXPAND withtin MERGE
+;;;    [expand positions when writing out reduced (merged) hash-table
 (defun merge-and-expand-bucket (g-min h-max)
-  (reset-timer 'reduce-bucket)
-  (start-timing 'reduce-bucket)
+  (reset-timer 'process-bucket-time)
+  (start-timing 'process-bucket-time)
+  ;; Now includes expand
   (merge-bucket g-min h-max) ;; Merge / filter bucket before expanding (check if merge-file exists)
-  (stop-timing 'reduce-bucket)
-  (when nil
-    (format t "~%Merged bucket g=~a h=~a"
-	    g-min h-max)
-    (format t "~%Open file count: ~a"
-	    (length (open-file-streams))))
-  (reset-timer 'expand-bucket)
-  (start-timing 'expand-bucket)
-  (expand-bucket g-min h-max)
-  (stop-timing 'expand-bucket)
-  (when nil
-    (format t "~%Expanded bucket g=~a h=~a"
-	    g-min h-max)
-    (format t "~%Open file count: ~a"
-	    (length (open-file-streams)))))
+  (stop-timing 'process-bucket-time)
+  )
 
 ;;; Merge and Expand moved to another file to isolate different implementations
 
@@ -547,11 +538,12 @@ Procedure External A*
 
   ;; setup timers
   (loop for timer-name in '(ELAPSED-TIME
+			    PROCESS-BUCKET-TIME
 			    ;; GENERATE-FRINGE  -- maybe time F-MIN diagonal ??
-			    EXPAND-BUCKET
+			    ;; EXPAND-BUCKET
 			    ;; EXPAND-SORT-BUFFER
 			    ;; EXPAND-WRITE-BUFFER
-			    REDUCE-BUCKET
+			    ;; REDUCE-BUCKET
 			    ;; REDUCE-WRITE-BUFFER
 			    )
        do

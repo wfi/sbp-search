@@ -489,6 +489,18 @@
 			(new-blanks-index **intermediate-blank-index**)
 			(intermediate-pos **intermediate-position**)
 			(t-piece-type **t-piece-type**))
+  (let ((cell-index (position t-piece-type intermediate-pos)))
+    ;;(print (list type-val cell-index))
+    (+ (aref **t-piece-hfun-component** cell-index)
+       (t-piece-hfun-blanks-offset cell-index
+				   (aref **cells-bitint-from-blank-index**
+					 new-blanks-index)))))
+
+#|
+(defun t-piece-h-fun (&optional
+			(new-blanks-index **intermediate-blank-index**)
+			(intermediate-pos **intermediate-position**)
+			(t-piece-type **t-piece-type**))
   (loop for cell-index from 0
      for type-val across intermediate-pos
      until (= type-val t-piece-type)
@@ -499,6 +511,7 @@
 					      (aref **cells-bitint-from-blank-index**
 						  new-blanks-index)))
 	       )))
+|#
 
 (defun t-piece-hfun-blanks-offset (t-cellnum blank-bits)
   (loop with (default-val . mask-form-list) = (aref **blanks-mask-lists** t-cellnum)
