@@ -453,11 +453,11 @@
 					      **intermediate-position**))
 			(succ-pos **sbp-position-register**)  ;; don't need to copy with write-to-file
 			(succ-radix (get-position-radix-val succ-pos)))
-		   (case (- succ-h h-max) ;; 1 when fmin+2, 0 when fmin+1, -1 when fmin
-		     (1 (write-position A2 succ-pos))
-		     (0 (write-position A1 succ-pos))
-		     (-1 (write-position A0 succ-pos))
-		     (t (error "case val ~a wasn't 1,0,or-1" (- succ-h h-max))))
+            (let ((x (- succ-h h-max)))
+                (cond((> x 0)(write-position A2 succ-pos))
+                     ((= x 0) (write-position A1 succ-pos))
+                     ((< x 0) (write-position A0 succ-pos))
+                     (else (error "case val ~a wasn't 1,0,or-1" (- succ-h h-max)))))
 		   ;; record data on same-h and same-radix
 		   (cond ((= succ-h h-max)
 			  (inc-counter 'successor-same-h-val)
@@ -489,12 +489,12 @@
 			(new-blanks-index **intermediate-blank-index**)
 			(intermediate-pos **intermediate-position**)
 			(t-piece-type **t-piece-type**))
-  (let ((cell-index (position t-piece-type intermediate-pos)))
+  (* 4(let ((cell-index (position t-piece-type intermediate-pos)))
     ;;(print (list type-val cell-index))
     (+ (aref **t-piece-hfun-component** cell-index)
        (t-piece-hfun-blanks-offset cell-index
 				   (aref **cells-bitint-from-blank-index**
-					 new-blanks-index)))))
+					 new-blanks-index))))))
 
 #|
 (defun t-piece-h-fun (&optional

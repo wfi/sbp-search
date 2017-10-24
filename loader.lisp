@@ -10,6 +10,11 @@
 (load "slide-puzzle-inits")
 
 
-(load "local-config.lisp") ;; NOT tracked by git, but containing local values
-;(defparameter **path-to-file-storage** "/Volumes/EXT-3TB-B/SEARCH-FILE-STORAGE/")
-;(defparameter **max-buffer-position-count** 5000000)
+(defparameter **path-to-file-storage** "storage")
+(defparameter **max-buffer-position-count** 5000000)
+
+(sbp-setup-ext-astar 'climb12 'foo)
+
+(external-a-star)
+
+
