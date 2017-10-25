@@ -310,16 +310,41 @@
 
 
 ;;; TODO -- detect when ht is full -- then special handle
-(defun load-hash-table-from-file (file-pathname)
+(defun load-hash-table-from-file (file-pathname
+				  &optional
+				    g-min radix	;; these must be supplied if expand-new-positions? is non-nil
+				    reduced-outbuff
+				    expand-new-positions?) ;; nil or output-object
+  (loop with inbuff = (new-input-buffer file-pathname) ;; TODO: REUSE 1 inbuff
+     with large-ht = **large-hash-table**
+     for pos = (get-front-position inbuff) then (next-position inbuff)
+     while pos
+     do
+       (unless (gethash pos large-ht) ;; ignore if already in HT
+	 ;; pos is new
+	 ;; add to hash-table
+	 (setf (gethash (replace (new-reusable-position) pos) ;; copy pos to use as key
+			large-ht)
+	       t)
+	 ;; write to reduced-outfile
+	 (when reduced-outbuff
+	   (write-position reduced-outbuff pos))
+	 ;; expand position (get-successors)
+	 (when expand-new-positions?
+	   (expand-position pos expand-new-positions? g-min radix)))
+     finally
+       (close-buffer inbuff)))
+
+;; Use this when loading position files that are already DUPLICATE-FREE
+(defun load-hash-table-from-file-dup-free (file-pathname)
   (loop with inbuff = (new-input-buffer file-pathname)
      with large-ht = **large-hash-table**    ;; assume already cleared ??
      for pos = (get-front-position inbuff) then (next-position inbuff)
      while pos
      do
-       (unless (gethash pos large-ht)
-	 (setf (gethash (replace (new-reusable-position) pos)  ;; copy pos to use as key
-			large-ht)
-	       t))
+       (setf (gethash (replace (new-reusable-position) pos)  ;; copy pos to use as key
+		      large-ht)
+	     t)
      finally
        (close-buffer inbuff)))
 
@@ -612,7 +637,68 @@ ratio))
 ;;;    Then writes out the reduced hash-table to file bucket-g-h-radix-r.data
 
 ;; NOW does BOTH MERGE and EXPAND
+;; New approach:
+;;   Load priors first (using no-dups) then add new positions from raw,
+;;      when new position:
+;;          add to hash-table
+;;          write to reduced-outfile
+;;          expand position (get-successors)
 (defun merge-bucket (g-min h-max)
+  ;; reset counters for expanding
+  (reset-counter 'bucket-successors)
+  (reset-counter 'bucket-expanded-positions)
+  (reset-counter 'successor-same-radix)
+  (reset-counter 'successor-same-h-val)
+  (reset-counter 'successor-same-radix-and-same-h-val)
+  (loop with duplicate-elim-data = nil
+     ;; output object for expand
+     with output-object = (list h-max
+				(get-bucket-out (1+ g-min) (1- h-max) **out-buff-0**) ;; A0
+				(get-bucket-out (1+ g-min) h-max **out-buff-1**) ;; A1
+				(get-bucket-out (1+ g-min) (1+ h-max) **out-buff-2**) ;; A2
+				)
+     for radix from 0 below 256 ;; generalize to Radix-count (using radix-bit-count ?)
+     for raw-pathname = (bucket-radix-pathname g-min h-max radix t) ;; T = add-raw
+     for prior-g-pathname = (bucket-radix-pathname (1- g-min) h-max radix nil) ;; NOT RAW
+     for prior-2-g-pathname = (bucket-radix-pathname (- g-min 2) h-max radix nil) ;; NOT RAW
+     when (probe-file raw-pathname)
+     do
+       (point-linear-output-buffer **ht-linear-output-buffer** g-min h-max radix nil) ;; raw? = nil to write to <bucket>.data
+       (setf duplicate-elim-data (list (get-file-position-size raw-pathname)))
+       (when (probe-file prior-2-g-pathname)
+	 (load-hash-table-from-file-dup-free prior-2-g-pathname))
+       (push (hash-table-count **large-hash-table**)
+	     duplicate-elim-data)
+       (when (probe-file prior-g-pathname)
+	 (load-hash-table-from-file-dup-free prior-g-pathname))
+       (push (hash-table-count **large-hash-table**)
+	     duplicate-elim-data)
+       (load-hash-table-from-file raw-pathname ;; this checks for new
+				  g-min
+				  radix
+				  **ht-linear-output-buffer**
+				  output-object) ;; use for expanding positions
+       (push (hash-table-count **large-hash-table**)
+	     duplicate-elim-data)
+       (format t "~%Radix ~a dup-elim: ~a"
+	       radix
+	       duplicate-elim-data)
+       (close-buffer **ht-linear-output-buffer**)
+       (clrhash **large-hash-table**)
+       (setf **next-free-position-in-large-vector** 0) ;; reuse all positions
+     ;; (when nil
+     ;;    (print (list 'radix radix 'open-files (length (open-file-streams)))))
+     finally
+     ;; Close-buffers A0, A1, A2
+       (loop for out-buff in (cdr output-object)
+	  when out-buff
+	  do
+	    (close-buffer out-buff))
+       ))
+
+;; save code -- this merges by loading raw then filtering by prior
+;;    finally expands when writing out reduced hash-table
+(defun old-merge-bucket (g-min h-max)
   (loop with duplicate-elim-data = nil
        with prior-bucket-sizes = nil
      ;; output object for expand
