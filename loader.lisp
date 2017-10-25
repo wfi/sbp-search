@@ -4,6 +4,10 @@
 (load "SBP-Ext-AStar-blank-index-jimslide")
 (load "slide-puzzle-inits")
 
-(load "local-config.lisp") ;; NOT tracked by git, but containing local values
-;(defparameter **path-to-file-storage** "./storage/")
-;(defparameter **max-buffer-position-count** 5000000)
+(defparameter **path-to-file-storage** "./storage/")
+(defparameter **max-buffer-position-count** 5000000)
+
+(sbp-setup-ext-astar 'climb12 'foo) ;;note if running climb15 or 24 add max-g arg
+
+(external-a-star)
+
