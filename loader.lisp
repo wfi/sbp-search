@@ -10,4 +10,3 @@
 (sbp-setup-ext-astar 'climb12 'foo) ;;note if running climb15 or 24 add max-g arg
 
 (external-a-star)
-

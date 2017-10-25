@@ -449,11 +449,10 @@
 		 (let ((succ-h (t-piece-h-fun new-blanks-index
 					      **intermediate-position**))
 		       (succ-pos **sbp-position-register**))  ;; don't need to copy with write-to-file
-		   (case (- succ-h h-max) ;; 1 when fmin+2, 0 when fmin+1, -1 when fmin
-		     (1 (write-position A2 succ-pos))
-		     (0 (write-position A1 succ-pos))
-		     (-1 (write-position A0 succ-pos))
-		     (t (error "case val ~a wasn't 1,0,or-1" (- succ-h h-max))))
+           (let ((x (- succ-h h-max)))
+             (cond ((> x 0) (write-position A2 succ-pos))
+                   ((= x 0) (write-position A1 succ-pos))
+                   ((< x 0) (write-position A0 succ-pos))))
 		   )
 		 (inc-counter 'all-successors)
 		 (when **debug**
@@ -526,7 +525,7 @@
 			(new-blanks-index **intermediate-blank-index**)
 			(intermediate-pos **intermediate-position**)
 			(t-piece-type **t-piece-type**))
-  (loop for cell-index from 0
+  (* 4 (loop for cell-index from 0
      for type-val across intermediate-pos
      until (= type-val t-piece-type)
      finally
@@ -535,7 +534,7 @@
 		  (t-piece-hfun-blanks-offset cell-index
 					      (aref **cells-bitint-from-blank-index**
 						  new-blanks-index)))
-	       )))
+	       ))))
 
 (defun t-piece-hfun-blanks-offset (t-cellnum blank-bits)
   (loop with (default-val . mask-form-list) = (aref **blanks-mask-lists** t-cellnum)

@@ -529,7 +529,7 @@ Procedure External A*
 (defun sbp-setup-ext-astar (puzzle-selector exper-tag
 			    &optional
 			      (max-g 110)
-			      (max-h 50)
+			      (max-h (* 4 50))
 			      (h-fun #'sbp-h-fun-from-compressed-pos)
 			      )
   (sbp-exper puzzle-selector exper-tag)  ;; among other things, sets up **puzzle-directory-name**
