@@ -421,49 +421,49 @@
   ;; uncompress position
   (jimslide-uncompress position) ;; target is **intermediate-position** and **intermediate-blank-index**
   (loop ; with source-blank-index = (extract-index-from-byte-seq position) ; now **intermediate-blank-index**
-     with (h-max A0 A1 A2) =  output-buffer
-     for (piece-type . piece-type-specs) in (aref **move-specs-for-blank-pattern** **intermediate-blank-index**)
-     do
-       (loop for (moved-from . moved-to-index-pairs) in piece-type-specs
-	  when   ; (logbitp moved-from piece-type-bits)   ;; there is a piece there, so is legal move!
-	    (= (aref **intermediate-position** moved-from)  ;; type of piece at position moved-from
-	       piece-type)   ;; must match piece-type from move-spec
-	  do
-	    (setf (aref **intermediate-position** moved-from) -1)  ;; remove moving piece
-	    (loop for (moved-to . new-blanks-index) in moved-to-index-pairs
+   with (h-max A0 A1 A2) =  output-buffer
+   for (piece-type . piece-type-specs) in (aref **move-specs-for-blank-pattern** **intermediate-blank-index**)
+   do
+   (loop for (moved-from . moved-to-index-pairs) in piece-type-specs
+         when ; (logbitp moved-from piece-type-bits)   ;; there is a piece there, so is legal move!
+         (= (aref **intermediate-position** moved-from) ;; type of piece at position moved-from
+            piece-type) ;; must match piece-type from move-spec
+         do
+         (setf (aref **intermediate-position** moved-from) -1) ;; remove moving piece
+         (loop for (moved-to . new-blanks-index) in moved-to-index-pairs
 	       do
 	       ;; make-move
-		 (setf (aref **intermediate-position** moved-to) piece-type)
+               (setf (aref **intermediate-position** moved-to) piece-type)
 	       ;; compress with NEW BLANK-INDEX
-		 (jimslide-compress new-blanks-index)  ;; compresses to **sbp-position-register**
-					               ;;     using new-banks-index
+               (jimslide-compress new-blanks-index) ;; compresses to **sbp-position-register**
+               ;;     using new-banks-index
 	       ;; check if solved
-		 (when (and check-solved?
-			    (solved?))   ;; checks **intermediate-position**
-		   (setf **compressed-solution-position**
-			 (copy-seq **sbp-position-register**)))
+               (when (and check-solved?
+                          (solved?)) ;; checks **intermediate-position**
+                 (setf **compressed-solution-position**
+                       (copy-seq **sbp-position-register**)))
 	       ;; write successor to output buffer
 	       ;; (print "SUCCESSOR:")
 	       ;; (fancy-display-compressed-position **sbp-position-register**)
-		 ;; (write-position output-buffer **sbp-position-register**)
-		 (let ((succ-h (t-piece-h-fun new-blanks-index
-					      **intermediate-position**))
-		       (succ-pos **sbp-position-register**))  ;; don't need to copy with write-to-file
-           (let ((x (- succ-h h-max)))
-             (cond ((> x 0) (write-position A2 succ-pos))
-                   ((= x 0) (write-position A1 succ-pos))
-                   ((< x 0) (write-position A0 succ-pos))))
-		   )
-		 (inc-counter 'all-successors)
-		 (when **debug**
-		   (format t "~% called (inc-counter 'all-successors) new count = ~a"
-			   (get-counter 'all-successors)))
+               ;; (write-position output-buffer **sbp-position-register**)
+               (let ((succ-h (t-piece-h-fun new-blanks-index
+                                            **intermediate-position**))
+                     (succ-pos **sbp-position-register**)) ;; don't need to copy with write-to-file
+                 (let ((x (- succ-h h-max)))
+                   (cond ((> x 0) (write-position A2 succ-pos))
+                         ((= x 0) (write-position A1 succ-pos))
+                         ((< x 0) (write-position A0 succ-pos))))
+                 )
+               (inc-counter 'all-successors)
+               (when **debug**
+                 (format t "~% called (inc-counter 'all-successors) new count = ~a"
+                         (get-counter 'all-successors)))
 	       ;; undo-move-to -- remove moved-to entry
-		 (setf (aref **intermediate-position** moved-to) -1)
-		 )
-	    (setf (aref **intermediate-position** moved-from) piece-type)  ;; reset moving piece
-	    )
-       )
+               (setf (aref **intermediate-position** moved-to) -1)
+               )
+         (setf (aref **intermediate-position** moved-from) piece-type) ;; reset moving piece
+         )
+   )
   ;; return solution if 1 has been found
   (cond (**compressed-solution-position**
          (copy-seq **compressed-solution-position**))  ;; return copy of compressed copy of solution, if one found (copy to prevent getting clobbered)
@@ -525,16 +525,18 @@
 			(new-blanks-index **intermediate-blank-index**)
 			(intermediate-pos **intermediate-position**)
 			(t-piece-type **t-piece-type**))
-  (* 4 (loop for cell-index from 0
-     for type-val across intermediate-pos
-     until (= type-val t-piece-type)
-     finally
-       ;(print (list type-val cell-index))
-       (return (+ (aref **t-piece-hfun-component** cell-index)
-		  (t-piece-hfun-blanks-offset cell-index
-					      (aref **cells-bitint-from-blank-index**
-						  new-blanks-index)))
-	       ))))
+  (* **h-scale**
+  (loop for cell-index from 0
+        for type-val across intermediate-pos
+        until (= type-val t-piece-type)
+        finally
+                                        ;(print (list type-val cell-index))
+        (return 
+                   (+ (aref **t-piece-hfun-component** cell-index)
+                      (t-piece-hfun-blanks-offset cell-index
+                                                  (aref **cells-bitint-from-blank-index**
+                                                        new-blanks-index))
+                   )))))
 
 (defun t-piece-hfun-blanks-offset (t-cellnum blank-bits)
   (loop with (default-val . mask-form-list) = (aref **blanks-mask-lists** t-cellnum)
