@@ -1,8 +1,3 @@
-(load "my-profiler")
-(load "Ext-AStar-code-from-file-search-engine")
-(load "Ext-AStar-file-based-SBP")
-(load "SBP-Ext-AStar-blank-index-jimslide")
-(load "slide-puzzle-inits")
 
 ;; reate your own local-config.lisp with settings for at least
 ;; the two defparametrs below. **path-to-file-storage** should NOT
@@ -16,5 +11,10 @@
 ;
 ;(sbp-setup-ext-astar 'climb12 'foo)
 ;(external-a-star)
-
 (load "local-config.lisp") ;; NOT tracked by git, but containing local values
+
+(load "my-profiler")
+(load "Ext-AStar-code-from-file-search-engine")
+(load "Ext-AStar-file-based-SBP")
+(load "SBP-Ext-AStar-blank-index-jimslide")
+(load "slide-puzzle-inits")

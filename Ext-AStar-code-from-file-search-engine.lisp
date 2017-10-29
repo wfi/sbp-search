@@ -307,12 +307,8 @@
 ;;; File Utilities
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-(defparameter **path-to-file-storage**
-  ;"/Users/glenniba/temp/SEARCH-FILE-STORAGE/"
-  ; /Volumes/EXT1-OTHER/SEARCH-FILE-STORAGE/"
-  ; "/Volumes/EXT-3TB-B/SEARCH-FILE-STORAGE/"
-  "/Volumes/Seagate6TB/SEARCH-FILE-STORAGE/"
-  )
+;(defparameter **path-to-file-storage**
+;  should be set and initialized in local-config.lisp                                        ;
 
 ;; convenience function
 ;;   Note: can "manually set directory" with SET-DIR
