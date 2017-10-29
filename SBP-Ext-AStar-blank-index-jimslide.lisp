@@ -469,6 +469,47 @@
         (t nil)))                         ;; otherwise NIL
 
 
+;; This returns a list of successors of position
+;;   It is used specifically in solution recovery
+(defun collect-successors (position)
+  ;; position is expected to be a byte-position in register:  **sbp-position-register**
+  ;; OOPS - its not in that register!  [it's actually a front-position of an input buffer - better not modify it!]
+  ;; uncompress position
+  (jimslide-uncompress position) ;; target is **intermediate-position** and **intermediate-blank-index**
+  (loop ; with source-blank-index = (extract-index-from-byte-seq position) ; now **intermediate-blank-index**
+     ;;with (h-max A0 A1 A2) =  output-buffer
+     with successor-list = nil 
+     for (piece-type . piece-type-specs) in (aref **move-specs-for-blank-pattern** **intermediate-blank-index**)
+     do
+       (loop for (moved-from . moved-to-index-pairs) in piece-type-specs
+	  when ; (logbitp moved-from piece-type-bits)   ;; there is a piece there, so is legal move!
+	    (= (aref **intermediate-position** moved-from) ;; type of piece at position moved-from
+	       piece-type) ;; must match piece-type from move-spec
+	  do
+	    (setf (aref **intermediate-position** moved-from) -1) ;; remove moving piece
+	    (loop for (moved-to . new-blanks-index) in moved-to-index-pairs
+	       do
+	       ;; make-move
+		 (setf (aref **intermediate-position** moved-to) piece-type)
+	       ;; compress with NEW BLANK-INDEX
+		 (jimslide-compress new-blanks-index) ;; compresses to **sbp-position-register**
+	       ;;     using new-banks-index
+
+	       ;; Copy and collect position **sbp-position-register**
+		 (push (copy-seq **sbp-position-register**)
+		       successor-list)
+		 
+	       ;; undo-move-to -- remove moved-to entry
+		 (setf (aref **intermediate-position** moved-to) -1)
+		 )
+	    (setf (aref **intermediate-position** moved-from) piece-type) ;; reset moving piece
+	    )
+     finally
+       (return successor-list)
+       )
+  )
+
+
 ;;; T-PIECE H-FUN
 (defun t-piece-h-fun (&optional
 			(new-blanks-index **intermediate-blank-index**)

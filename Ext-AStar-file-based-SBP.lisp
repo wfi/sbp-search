@@ -360,16 +360,17 @@ Procedure External A*
   (let* ((h (funcall **h-fun** pos))
 	 (succ-list (collect-successors pos))   ;; possible parents, since invertible
 	 )
-    (cond ((find-parent? succ-list (get-bucket **open** (1- g) (1+ h))))
-	  ((find-parent? succ-list (get-bucket **open** (1- g) h)))
-	  ((find-parent? succ-list (get-bucket **open** (1- g) (1- h))))
+    (cond ((find-parent? succ-list (get-bucket-in (1- g) (1+ h))))
+	  ((find-parent? succ-list (get-bucket-in (1- g) h)))
+	  ((find-parent? succ-list (get-bucket-in (1- g) (1- h))))
 	  (t nil))))
 
-(defun find-parent? (poss-parent-list ht-bucket)
-  (when ht-bucket
-    (loop for pos being the hash-keys of ht-bucket
+(defun find-parent? (poss-parent-list in-buffer)
+  (when in-buffer
+    (loop for pos = (get-front-position in-buffer) then (next-position in-buffer)
+       while pos
        when (member pos poss-parent-list :test **equality-test**)
-	 return pos)))
+	 return (copy-seq pos))))
 		    
 
 (defun count-all-positions ()
