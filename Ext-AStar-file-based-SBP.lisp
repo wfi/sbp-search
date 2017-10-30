@@ -206,7 +206,7 @@ Procedure External A*
       (princ output-object))
     (loop with sol-pos? = nil
           with in-buff = (get-bucket-in g-min h-max)
-          for pos = (when in-buff (front-position in-buff)) then (next-position in-buff)
+          for pos = (when in-buff (get-front-position in-buff)) then (next-position in-buff)
           while (and pos
                      (not **solution**))
           do
