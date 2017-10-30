@@ -1,4 +1,4 @@
-
+(declaim (optimize (speed 3) (debug 0) (safety 0)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; VERSION NOTES:

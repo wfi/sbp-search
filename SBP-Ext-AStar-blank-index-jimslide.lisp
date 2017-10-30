@@ -1,3 +1,4 @@
+(declaim (optimize (speed 3) (debug 0) (safety 0)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; SLIDING BLOCK PUZZLE DOMAIN IMPLEMENTATION -- ADAPTED FOR EXTERNAL A-STAR
