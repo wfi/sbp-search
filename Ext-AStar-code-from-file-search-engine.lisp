@@ -93,6 +93,10 @@
 ;;; GLOBALS
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
+(defvar **path-to-file-storage**) ; declared in local-config.lisp
+
+(defvar **max-buffer-position-count**) ; declared in local-config.lisp
+
 (defparameter **open** nil)
 
 (defparameter **candidate-position-register** nil) ;; allocated later based on **position-size**
@@ -103,8 +107,6 @@
                                  ;;   setup once and reuse (check if need to grow it larger?)
 
 (defparameter **heap-threshold** 5)   ;; nil => don't use heap ever, n => use heap if segment-count > n
-
-(defparameter **max-buffer-position-count** 100000000) ;; make this as large as feasible once everything is working!
 
 (defparameter **free-input-buffers**     ;; for reusing input-buffers
   (make-array 8200 :initial-element nil))    ;; ran out with 1000 on level 117 of BoxedIn 1-46
@@ -123,7 +125,7 @@
 
 (defparameter **start-pos-list** nil)       ;; compressed list of start positions (set by domain-init)
 (defparameter **puzzle-name** nil)  ;; should be set by puzzle or domain
-(defparameter **puzzle-directory-name** "DUMMY_DIRECTORY_NAME")  ;; should be set by puzzle or domain
+(defvar **puzzle-directory-name**)  ;; should be set by puzzle or domain
 (defparameter **exper-tag** nil) ;; if non-nil, insert in name of puzzle search folder 
                                  ;; (keep experiment results / files separate)
 (defparameter **moves-invertible?** t)   ;; should always set T or NIL for each domain-init
@@ -181,12 +183,6 @@
 ;;; File Utilities
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-(defparameter **path-to-file-storage**
-  ;"/Users/glenniba/temp/SEARCH-FILE-STORAGE/"
-  ; /Volumes/EXT1-OTHER/SEARCH-FILE-STORAGE/"
-  "/Volumes/EXT-3TB-B/SEARCH-FILE-STORAGE/"
-  ; "/Volumes/Seagate6TB/SEARCH-FILE-STORAGE/"
-  )
 
 ;; convenience function
 ;;   Note: can "manually set directory" with SET-DIR
@@ -508,10 +504,6 @@ ratio))
        (equal (array-element-type pos)
 	      (list 'unsigned-byte **byte-size**))))
        
-
-;; moved earlier to avoid compiler error
-;;; (defparameter **max-buffer-position-count** 10000000) ;; make this as large as feasible once everything is working!
-
 
 ;;; NEVER RE-USE buffer-vector - only use NEW-OUTPUT-BUFFER for init
 ;;;   NOW ONLY MAKES INSTANCE & SETS BUFFER-VECTOR

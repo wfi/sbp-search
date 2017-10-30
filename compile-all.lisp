@@ -1,6 +1,5 @@
 
-;; This should set the default directory of the compile-file forms
-(setf *default-pathname-defaults* *load-pathname*)
+(load "local-config")
 
 (compile-file "my-profiler")
 (compile-file "Ext-AStar-code-from-file-search-engine")

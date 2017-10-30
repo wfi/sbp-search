@@ -5,6 +5,7 @@ storage
 *~
 *.bak
 \#*\#
+TAGS
 
 # Compiled source #
 ###################

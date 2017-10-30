@@ -97,7 +97,7 @@
 ;;;           Deleting has advantage of avoiding BUG of residual (possibly incompatible) fringes lying around to mess up merge
 (defparameter **puzzle-name** nil)    ;; needs to get set by actual puzzle initialization
 (defparameter **exper-tag** nil)
-(defparameter **puzzle-directory-name** "Default_SBP_Directory_Name")
+(defvar **puzzle-directory-name**)
 
 (defparameter **position-size** nil)  ;; number of bytes to encode a sequence (must be set by domain-init)
 (defparameter **byte-size** 32)

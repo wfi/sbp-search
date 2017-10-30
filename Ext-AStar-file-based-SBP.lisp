@@ -571,7 +571,7 @@ Procedure External A*
   (let ((puzzle-directory-files (puzzle-directory-file-list)))
     (when (and T    ;; was (not search-restart?)  no restart implemented yet
 	       puzzle-directory-files)
-      (warn "Files Alreay exist in Puzzle Directory")
+      (warn "sbp-setup-ext-astar: Files Already exist in Puzzle Directory")
       (pprint puzzle-directory-files)
       (if (yes-or-no-p "Type Yes to delete these files and continue search, or No to abort")
           ;; NOTE: this will delete all files starting with "." as well!  (maybe should omit deleting those?)
