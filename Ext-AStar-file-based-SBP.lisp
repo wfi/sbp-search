@@ -213,7 +213,7 @@ Procedure External A*
 	 (setf sol-pos? (generate-successors pos output-object))
 					;(print 'after-calling-generate-successors)
 	 (when sol-pos?
-	   (setf  **solution** (list sol-pos? (1+ g-min)))
+	   (setf  **solution** (list sol-pos? (1+ g-min) h-max))      ;; h-max is h-index of parent
 	   (format t "~%FOUND SOLUTION WITH G-VAL = ~a" (1+ g-min)))
 
        finally
@@ -333,37 +333,64 @@ Procedure External A*
 		 always (zerop (get-file-size bucket-seg-path)))))))
 
 
-(defun recover-solution (solution-pair)
-  (let ((sol-seq (recover-solution-sequence solution-pair)))
+(defun recover-solution (solution-triple)
+  (let ((sol-seq (recover-solution-sequence solution-triple)))
     (loop for pos in sol-seq
        do
 	 (fancy-display-compressed-position pos))))
 
-(defun recover-solution-sequence (solution-pair)
-  (loop with (sol-pos g) = solution-pair
+(defun recover-solution-sequence (solution-triple)
+  (loop with (sol-pos g final-h) = solution-triple   ;; final-h is h-index of solution parent
+     ;; with final-h = (find-h-index sol-pos g)
      with sol-seq = (list sol-pos)
      for g-val from g downto 0
+     for h-index = final-h then parent-h
      for curr-pos = sol-pos then parent-pos
-     for parent-pos = (find-parent curr-pos g-val)
+     for (parent-pos parent-h) = (find-parent curr-pos g-val h-index)
      while parent-pos
      do
        (push parent-pos sol-seq)
      finally
        (return sol-seq)))
 
-
+;;; This fails since no buckets, only segments for solution g
+(defun find-h-index (pos g)
+  (loop
+     for h from 0 to **max-h**
+     for inbuff = (get-bucket-in g h)
+     for pos-found? = (find-parent? (list pos) inbuff)
+     until pos-found?
+     do
+       (when inbuff
+	 (close-buffer inbuff))
+     finally
+       (when inbuff
+	 (close-buffer inbuff))
+       (return h)))
 
 ;; only use when moves are INVERTIBLE (not true for SBP <<-- HUH??)
-(defun find-parent (pos g)
+;; Modified to return pair ( parent-pos  h-index-of-parent-pos )
+(defun find-parent (pos g &optional h-index (delta-h-list '(-1 0 1)))
   ;; need to look at buckets (g-1, h+1) (g-1, h) and (g-1, h-1)
   ;;    since h can only change by at most 1
-  (let* ((h (funcall **h-fun** pos))
-	 (succ-list (collect-successors pos))   ;; possible parents, since invertible
-	 )
-    (cond ((find-parent? succ-list (get-bucket-in (1- g) (1+ h))))
-	  ((find-parent? succ-list (get-bucket-in (1- g) h)))
-	  ((find-parent? succ-list (get-bucket-in (1- g) (1- h))))
-	  (t nil))))
+  (loop
+     with h = (if h-index
+		  h-index
+		  (funcall **h-fun** pos))
+     with succ-list = (collect-successors pos)   ;; possible parents, since invertible
+     with parent = nil
+     with parent-h = nil
+     for delta-h in delta-h-list
+     for try-h = (+ h delta-h)
+     for inbuff = (get-bucket-in (1- g) try-h)
+     until parent
+     do
+       (when (setf parent (find-parent? succ-list inbuff))
+	 (setf parent-h try-h))
+       (when inbuff
+	 (close-buffer inbuff))  ;; close inbuff whether or not parent found
+     finally
+       (return (list parent parent-h))))
 
 (defun find-parent? (poss-parent-list in-buffer)
   (when in-buffer
