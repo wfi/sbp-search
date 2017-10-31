@@ -767,10 +767,20 @@ ratio))
        (close-buffer output-buffer)
        )))
 
-(defun collect-prior-buckets (g h)
+(defun collect-prior-buckets-admissible (g h)
   (loop with least-depth-prior-fringe = (- g 2)  ;; look at previous 2 buckets with same h
      for prior-g from (1- g) downto least-depth-prior-fringe
      for prior-bucket-path = (bucket-pathname prior-g h)
+     when (probe-file prior-bucket-path)   ;; changed while to when (should work the same)
+     collect prior-bucket-path)
+  )
+
+(defun collect-prior-buckets (g h &optional (admissible? nil))
+  (loop with g-h-delta-list = (if admissible?
+				  '((-1 0) (-2 0))
+				  '((-1 -1)(-1 0)(-1 1)(-2 -2)(-2 -1)(-2 0)(-2 1)(-2 2)))
+     for (delta-g delta-h) in g-h-delta-list
+     for prior-bucket-path = (bucket-pathname (+ g delta-g) (+ h delta-h))
      when (probe-file prior-bucket-path)   ;; changed while to when (should work the same)
      collect prior-bucket-path)
   )
