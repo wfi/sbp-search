@@ -108,9 +108,12 @@ Procedure External A*
                           **final-8bit-byte-position-size**
                           **puzzle-name**
                           **puzzle-directory-name**
+			  **path-to-file-storage**
                           **exper-tag**
                           **moves-invertible?**
                           **debug**
+			  **prior-fan?**
+			  **h-scale**
                           ))
   ;; start-timing
   (start-timing 'elapsed-time)

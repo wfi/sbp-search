@@ -112,6 +112,10 @@
   (make-array 8200 :initial-element nil))    ;; ran out with 1000 on level 117 of BoxedIn 1-46
 					     ;;  Climb15a exhausted 2000 with buff=50000 pos's
 
+(defparameter **prior-fan?** T)     ;; controls which prior buckets used in duplicate elimination
+                                    ;;  NIL is old behavior as for admissible (just check g-1 & g-2)
+                                    ;;  T "fans out" to check 8 prior buckets
+
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; DOMAIN INTERFACE
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -775,10 +779,10 @@ ratio))
      collect prior-bucket-path)
   )
 
-(defun collect-prior-buckets (g h &optional (admissible? nil))
-  (loop with g-h-delta-list = (if admissible?
-				  '((-1 0) (-2 0))
-				  '((-1 -1)(-1 0)(-1 1)(-2 -2)(-2 -1)(-2 0)(-2 1)(-2 2)))
+(defun collect-prior-buckets (g h &optional (prior-fan? **prior-fan?**))
+  (loop with g-h-delta-list = (if prior-fan?
+				  '((-1 -1)(-1 0)(-1 1)(-2 -2)(-2 -1)(-2 0)(-2 1)(-2 2))
+				  '((-1 0) (-2 0)))
      for (delta-g delta-h) in g-h-delta-list
      for prior-bucket-path = (bucket-pathname (+ g delta-g) (+ h delta-h))
      when (probe-file prior-bucket-path)   ;; changed while to when (should work the same)
