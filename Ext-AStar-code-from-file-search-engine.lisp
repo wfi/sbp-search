@@ -43,8 +43,6 @@
 ;;;                     but should still find optimal solutions  without complete checks - just will have larger fringes]
 ;;;        
 
-;;    Generate-New-Fringe (depth)
-
 ;;; COMPARE BYTE-POSITIONS
 ;;;   return -1, 0, or 1 according to <, =, or >
 
@@ -95,6 +93,10 @@
 ;;; GLOBALS
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
+(defvar **path-to-file-storage**) ; declared in local-config.lisp
+
+(defvar **max-buffer-position-count**) ; declared in local-config.lisp
+
 (defparameter **open** nil)
 
 (defparameter **candidate-position-register** nil) ;; allocated later based on **position-size**
@@ -105,8 +107,6 @@
                                  ;;   setup once and reuse (check if need to grow it larger?)
 
 (defparameter **heap-threshold** 5)   ;; nil => don't use heap ever, n => use heap if segment-count > n
-
-(defparameter **max-buffer-position-count** 100000000) ;; make this as large as feasible once everything is working!
 
 (defparameter **free-input-buffers**     ;; for reusing input-buffers
   (make-array 8200 :initial-element nil))    ;; ran out with 1000 on level 117 of BoxedIn 1-46
@@ -125,7 +125,7 @@
 
 (defparameter **start-pos-list** nil)       ;; compressed list of start positions (set by domain-init)
 (defparameter **puzzle-name** nil)  ;; should be set by puzzle or domain
-(defparameter **puzzle-directory-name** "DUMMY_DIRECTORY_NAME")  ;; should be set by puzzle or domain
+(defvar **puzzle-directory-name**)  ;; should be set by puzzle or domain
 (defparameter **exper-tag** nil) ;; if non-nil, insert in name of puzzle search folder 
                                  ;; (keep experiment results / files separate)
 (defparameter **moves-invertible?** t)   ;; should always set T or NIL for each domain-init
@@ -147,130 +147,6 @@
 ;;; Define when moves are NOT-INVERTIBLE:
 ;;;    (defun COLLECT-SUCCESSORS (<compressed-position>)  ... )
 ;;;      ;; returns a list of compressed-successors  (no writing to output-buffer so that arg is omitted)
-
-
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;;; ENGINE SETUP
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-
-
-		       
-
-(defun file-search-engine-setup (&optional
-				 search-restart?)  ;; when search-restart? = T, ok for files to exist
-  ;; Check Puzzle is initialized (shared globals all ok)
-  (unless (puzzle-initialized-ok?)
-    (error "Puzzle Initialization is not valid"))
-  ;; ensure puzzle-directory exits
-  (ensure-directories-exist (puzzle-directory-pathname))
-  ;; Calculate position size in 8-bit bytes (using **position-size** and **byte-size**)
-  (setf **final-8bit-byte-position-size**     ;; needed to calculate position counts for fringe files
-	(* **position-size** (ceiling **byte-size** 8)))
-  ;; Re-set **solution-position**
-  (setf  **solution-position** nil)
-  ;; Set candidate-position-register for use by merge-segments
-  (setf **candidate-position-register**
-        (make-byte-vector **position-size**))
-  (setf **heap** (create-empty-heap 4000)) ;; 2000 input buffers should suffice for a while, but maybe needs larger later (2-28-2016 do need more for climb15a with buff=50000)
-  ;; check **free-input-buffers** to see if position-size is ok
-  (let ((first-inbuff (aref **free-input-buffers** 0)))
-    (when (and first-inbuff
-	       (not (= **position-size** (position-size first-inbuff))))
-      (fill **free-input-buffers** nil))) ;; need to allocate new inbuffs with correct position sizes
-  ;; if directory is non-empty ask if should be cleared before search
-  (let ((puzzle-directory-files (puzzle-directory-file-list)))
-    (when (and (not search-restart?)
-	       puzzle-directory-files)
-      (warn "Files Alreay exist in Puzzle Directory")
-      (pprint puzzle-directory-files)
-      (if (yes-or-no-p "Type Yes to delete these files and continue search, or No to abort")
-          ;; NOTE: this will delete all files starting with "." as well!  (maybe should omit deleting those?)
-          ;;    Seems if there are sub-directories, will not delete those (even if they are empty)
-          (loop for filepath in puzzle-directory-files
-                do
-                (delete-file filepath))
-        (error "aborting -- not safe to do new search with non-empty puzzle directory"))))
-  ;; setup timers
-  (loop for timer-name in '(GENERATE-FRINGE
-			    EXPAND 
-			    EXPAND-SORT-BUFFER
-			    EXPAND-WRITE-BUFFER
-			    REDUCE
-			    REDUCE-WRITE-BUFFER)
-       do
-       (allow-timing timer-name))   ;; this does not reset - should do that when needed
-  ;; setup counters
-  (allow-counting 'all-successors)
-  (allow-counting 'total-nodes-expanded)
-  ;; reset-counters
-  (reset-counter 'all-successors)  ;; not used in this file
-  (reset-counter 'total-nodes-expanded)
-  )
-
-
-(defun puzzle-initialized-ok? ()
-  (and **puzzle-name**   ;; puzzle-name   (only nil if it hasn't been set by puzzle initialization)
-       (and **position-size**
-            (integerp **position-size**)
-            (> **position-size** 0))
-       **start-pos-list**    ;; search is guaranteed to fail if start with an empty list of positions
-       (loop for pos in **start-pos-list**
-             always
-             (= (length pos) **position-size**))))
-
-
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;;; New Fringe
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-
-(defun generate-new-fringe (depth)
-  ;; reset timers 
-  (reset-timer 'generate-fringe)
-  (reset-timer 'expand)
-  (reset-timer 'expand-sort-buffer)
-  (reset-timer 'expand-write-buffer)
-  (reset-timer 'reduce)
-  (reset-timer 'reduce-write-buffer)
-  ;; start timers
-  (start-timing 'generate-fringe)
-  (start-timing 'expand)
-  #|
-  ;;; Show Heap Utilization		;
-  (print "Start of GENERATE-NEW-FRINGE:")
-  (heap-utilization)
-  |#
-  ;;; Setup Input Buffer to read from fringe at depth (1- depth)  ;; check that it exists!
-  ;;; Setup Multi-Output-Buffer to write successor positions out to
-  ;;; Read positions sequentially from Input Buffer
-  (loop with input-buffer = (new-input-buffer (fringe-pathname (1- depth)))
-     with output-buffer = (new-output-buffer depth 1)
-     with solution-position = nil
-     for next-position = (get-front-position input-buffer) then (next-position input-buffer)
-     while (and (not solution-position)
-		next-position)
-     do
-     ;; call domain code to generate successors of next-position
-       (setf solution-position
-	     (generate-successors next-position output-buffer)) ; returns "solution position (uncompressed?)" if one found, otherwise NIL
-					;   Also calls (WRITE-POSITION output-buffer successor) for each (new) successor
-       (inc-counter 'total-nodes-expanded)
-     finally
-       (close-buffer input-buffer)
-       (close-buffer output-buffer)
-       (stop-timing 'expand)
-       (unless solution-position ; omit extra merge work if solution found
-	 (merge-segments depth)) ;; merges segments into single sorted file (with no duplicates) at same depth
-       (setf **solution-position** (copy-seq solution-position)) ;; make sure not to lose position if found!
-       (return **solution-position**)   ; report if solved!!
-       )
-  (stop-timing 'generate-fringe)
-  #|
-  ;;; Show Heap Utilization		;
-  (print "End of GENERATE-NEW-FRINGE:")
-  (heap-utilization)
-  |#
-  )
-
 
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -307,8 +183,6 @@
 ;;; File Utilities
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-;(defparameter **path-to-file-storage**
-;  should be set and initialized in local-config.lisp                                        ;
 
 ;; convenience function
 ;;   Note: can "manually set directory" with SET-DIR
@@ -452,9 +326,10 @@ ratio))
      with inbuff2 = (new-input-buffer pathname2)
      for pos1 = (get-front-position inbuff1) then (next-position inbuff1)
      for pos2 = (get-front-position inbuff2) then (next-position inbuff2)
-     while (equalp pos1 pos2)   ;; might this never terminate if contents identical ??
+     while (and pos1 pos2             ;; terminate if either file ends  
+		(equalp pos1 pos2))  
      finally
-       (return (list pos1 pos2))))
+       (return (list pos1 pos2))))    ;; Note: should return (NIL NIL) if files identical
 
 
 
@@ -629,10 +504,6 @@ ratio))
        (equal (array-element-type pos)
 	      (list 'unsigned-byte **byte-size**))))
        
-
-;; moved earlier to avoid compiler error
-;;; (defparameter **max-buffer-position-count** 10000000) ;; make this as large as feasible once everything is working!
-
 
 ;;; NEVER RE-USE buffer-vector - only use NEW-OUTPUT-BUFFER for init
 ;;;   NOW ONLY MAKES INSTANCE & SETS BUFFER-VECTOR
@@ -896,10 +767,20 @@ ratio))
        (close-buffer output-buffer)
        )))
 
-(defun collect-prior-buckets (g h)
+(defun collect-prior-buckets-admissible (g h)
   (loop with least-depth-prior-fringe = (- g 2)  ;; look at previous 2 buckets with same h
      for prior-g from (1- g) downto least-depth-prior-fringe
      for prior-bucket-path = (bucket-pathname prior-g h)
+     when (probe-file prior-bucket-path)   ;; changed while to when (should work the same)
+     collect prior-bucket-path)
+  )
+
+(defun collect-prior-buckets (g h &optional (admissible? nil))
+  (loop with g-h-delta-list = (if admissible?
+				  '((-1 0) (-2 0))
+				  '((-1 -1)(-1 0)(-1 1)(-2 -2)(-2 -1)(-2 0)(-2 1)(-2 2)))
+     for (delta-g delta-h) in g-h-delta-list
+     for prior-bucket-path = (bucket-pathname (+ g delta-g) (+ h delta-h))
      when (probe-file prior-bucket-path)   ;; changed while to when (should work the same)
      collect prior-bucket-path)
   )
@@ -977,8 +858,8 @@ ratio))
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 
-
-
+;;; SAVE THIS -- BUT NEEDS TO BE UPDATED
+#| 
 (defun write-initial-fringe (start-position-list &optional (depth 0))
   ;; needs to be sorted!
   (loop with outbuff = (new-output-buffer depth 1)   ;; write as segments, in case too large to fit in buffer all at once
@@ -990,6 +871,8 @@ ratio))
      (merge-segments depth)  
      (delete-fringe-segments depth)))
   
+|#
+
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; TIMING FUNCTIONS MOVED ->  MY-PROFILER.LISP
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -1004,6 +887,8 @@ ratio))
 ;;;   OK - Fixed now - by making find-prior-position branch on **moves-invertible?**
 ;;;      (and using either find-prior-position-if-invertible or find-prior-position-not-invertible)
 
+;;; SAVE -- though not used now -- update for solution recovery when needed
+#|
 (defun recover-solution-sequence (final-depth final-position)   ;; note works with compressed (byte) positions
   (loop with compressed-solution-sequence = (list final-position)
         for depth from final-depth downto 1
@@ -1077,6 +962,7 @@ ratio))
        (close-buffer inbuff-a)
        (close-buffer inbuff-b)
        (return common-position)))   ;; NIL if none found, else the position itself
+|#
 
 (defun fancy-display-compressed-solution-sequence (&optional (compressed-solution-sequence **compressed-solution-sequence**))
   (loop for byte-pos in compressed-solution-sequence

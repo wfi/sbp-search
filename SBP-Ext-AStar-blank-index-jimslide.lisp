@@ -3,8 +3,6 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; SLIDING BLOCK PUZZLE DOMAIN IMPLEMENTATION -- ADAPTED FOR EXTERNAL A-STAR
 ;;;     -- USING BLANK-INDEX AND JIMSLIDE COMPRESSION
-;;;   branched from file:
-;;;     /BreadthFirstFileSearch/Domains/Sliding-Block-Puzzles/SBP-7-blank-index-jimslide.lisp
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 ;;; VERSION NOTES
@@ -100,7 +98,7 @@
 ;;;           Deleting has advantage of avoiding BUG of residual (possibly incompatible) fringes lying around to mess up merge
 (defparameter **puzzle-name** nil)    ;; needs to get set by actual puzzle initialization
 (defparameter **exper-tag** nil)
-(defparameter **puzzle-directory-name** "Default_SBP_Directory_Name")
+(defvar **puzzle-directory-name**)
 
 (defparameter **position-size** nil)  ;; number of bytes to encode a sequence (must be set by domain-init)
 (defparameter **byte-size** 32)
@@ -470,30 +468,17 @@
          (copy-seq **compressed-solution-position**))  ;; return copy of compressed copy of solution, if one found (copy to prevent getting clobbered)
         (t nil)))                         ;; otherwise NIL
 
-;; Now coded directly into generate-successors
-#|
-(defun write-position (output-object position) ;; must COPY position before writing / storing in HT
-  ;; output-object = (h-max A0 A1 A2)
-  ;; All for side-effects -- puts copy of position in A0, A1, or A2 HashTable of output-object
-  (let ((h-max (first output-object))
-	(succ-h (funcall **h-fun** position))
-	(succ-pos (copy-seq position)))
-    (case (- succ-h h-max) ;; 1 when fmin+2, 0 when fmin+1, -1 when fmin
-      (1 (store-bucket succ-pos (fourth output-object)))  ;; A2
-      (0 (store-bucket succ-pos (third output-object)))	  ;; A1
-      (-1 (store-bucket succ-pos (second output-object))) ;; A0
-      (t (error "case val ~a wasn't 1,0,or-1" (- succ-h h-max))))
-    ))
-|#
 
-;; returns a list of successors (used in solution recovery)
+;; This returns a list of successors of position
+;;   It is used specifically in solution recovery
 (defun collect-successors (position)
   ;; position is expected to be a byte-position in register:  **sbp-position-register**
   ;; OOPS - its not in that register!  [it's actually a front-position of an input buffer - better not modify it!]
   ;; uncompress position
   (jimslide-uncompress position) ;; target is **intermediate-position** and **intermediate-blank-index**
   (loop ; with source-blank-index = (extract-index-from-byte-seq position) ; now **intermediate-blank-index**
-     with successor-list = nil
+     ;;with (h-max A0 A1 A2) =  output-buffer
+     with successor-list = nil 
      for (piece-type . piece-type-specs) in (aref **move-specs-for-blank-pattern** **intermediate-blank-index**)
      do
        (loop for (moved-from . moved-to-index-pairs) in piece-type-specs
@@ -509,8 +494,11 @@
 	       ;; compress with NEW BLANK-INDEX
 		 (jimslide-compress new-blanks-index) ;; compresses to **sbp-position-register**
 	       ;;     using new-banks-index
+
+	       ;; Copy and collect position **sbp-position-register**
 		 (push (copy-seq **sbp-position-register**)
 		       successor-list)
+		 
 	       ;; undo-move-to -- remove moved-to entry
 		 (setf (aref **intermediate-position** moved-to) -1)
 		 )
@@ -518,8 +506,9 @@
 	    )
      finally
        (return successor-list)
-       ))
-  
+       )
+  )
+
 
 ;;; T-PIECE H-FUN
 (defun t-piece-h-fun (&optional
@@ -643,75 +632,6 @@
 	    row-distance
 	    (+ 1 (* 4 (1- row-distance)))))))
 
-
-;;; old SBP-2 code
-#|
-(defun generate-successors (position output-buffer &optional (check-solved? **check-solved?**))
-  ;; position is expected to be a byte-position in register:  **sbp-position-register**
-  ;; OOPS - its not in that register!  [it's actually a front-position of an input buffer - better not modify it!]
-  ;; uncompress position
-  (jimslide-uncompress position) ;; target is **intermediate-position** and **intermediate-blank-index**
-  (loop ; with source-blank-index = (extract-index-from-byte-seq position) ; now **intermediate-blank-index**
-     for piece-type-form in (aref **move-specs-for-blank-pattern** **intermediate-blank-index**)
-     do
-       (loop with (piece-type . move-specs)  =  piece-type-form
-	  ;; with piece-type-offset = (aref **piece-type-offsets-vector** piece-type)
-	  ;; with piece-type-count = (aref **piece-type-counts** piece-type)
-	  ;; with piece-type-bits = (extract-bit-int position piece-type-offset piece-type-count)
-	  for move-spec in move-specs
-	  for moved-from = (aref move-spec 0)
-	  for moved-to = (aref move-spec 1)
-	  ;; initially
-	  ;; (replace **sbp-position-register** position) ;; only do this with new piece-type start
-	    #|
-	    (print (list piece-type piece-type-offset piece-type-count piece-type-bits))
-	    (print "SOURCE:")
-	    (fancy-display-compressed-position **sbp-position-register**)
-	    (format t "~%source-blank-index = ~a" source-blank-index)
-	    (pprint move-specs)
-	    |#
-	when ; (logbitp moved-from piece-type-bits)   ;; there is a piece there, so is legal move!
-	  (= (aref **intermediate-position** moved-from)  ;; type of piece at position moved-from
-	     piece-type)   ;; must match piece-type from move-spec
-	do
-	  ;;(format t "~%Legal MoveSpec: ~a" move-spec)
-	  ;; construct successor in **sbp-position-register**
-	    #|
-	  (write-bit-int-to-vector (logxor piece-type-bits
-					     (ash 1 moved-from)
-					     (ash 1 (aref move-spec 1)))   ;; moved-to
-				     **sbp-position-register**
-				     piece-type-offset)
-	  (replace **sbp-position-register**
-		     move-spec
-		     :start1 **blanks-offset**
-		     :start2 2)
-	    |#
-	  ;; make-move
-	    (setf (aref **intermediate-position** moved-to) piece-type
-		  (aref **intermediate-position** moved-from) -1)
-	  ;; compress with NEW BLANK-INDEX
-	    (jimslide-compress    ;; compresses to **sbp-position-register**
-	     (extract-index-from-byte-seq move-spec 2))   ;; extract new blank-index for compression
-	  ;; check if solved
-	    (when (and check-solved?
-		       (solved?))   ;; checks **intermediate-position**
-	      (setf **compressed-solution-position**
-		    (copy-seq **sbp-position-register**)))
-	    ;; write successor to output buffer
-	    ;; (print "SUCCESSOR:")
-	    ;; (fancy-display-compressed-position **sbp-position-register**)
-	    (write-position output-buffer **sbp-position-register**)
-	    (inc-counter 'all-successors)
-	  ;; undo-move (reset to "original" intermediate position
-	    (setf (aref **intermediate-position** moved-from) piece-type
-		  (aref **intermediate-position** moved-to) -1)
-	    ))
-  ;; return solution if 1 has been found
-  (cond (**compressed-solution-position**
-         (copy-seq **compressed-solution-position**))  ;; return copy of compressed copy of solution, if one found (copy to prevent getting clobbered)
-        (t nil)))                         ;; otherwise NIL
-|#
 
 ;;; Utilities
 
@@ -999,28 +919,7 @@
      (ash cell-to 20)
      new-blanks-index)
   )
-;; old code
-#|
-		     (defun make-move-spec (cell-from cell-to new-blanks-index)
-  ;; make a vector to save space?	;
-(let ((new-move-spec (make-byte-vector (+ 2 **blank-index-bytes**))))
-(setf (aref new-move-spec 0) cell-from
-(aref new-move-spec 1) cell-to)
-(write-integer-as-bytes new-blanks-index new-move-spec :start 2)
-new-move-spec))
-		     |#
 
-;; NOTE: this is for use when integer is a blanks-pattern-index (NOT for bit-ints)
-(defun write-integer-as-bytes (integer write-vector &key (start 0))
-  ;; note: this writes bytes in "reverse" order -- low-order byte 1st
-  (loop 
-     for index from start
-     for int = integer then (floor int 256)
-     for byte-val = (mod int 256)
-     until (zerop int)
-     do
-       (setf (aref write-vector index)
-	     byte-val)))
 
 ;; This only works for 3-byte indices  -- HMMM - seems it isn't called
 (defun extract-index-from-move-spec (move-spec)
@@ -1066,57 +965,7 @@ new-move-spec))
      finally
        (return result)))
   
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;;; END of merged/copied Blank-indexing-2.lisp code
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;;; OLD CODE BELOW
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;;; Sliding Block Puzzle Solver
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-
-#|
-(defvar *solution-target*)
-(defvar *fringe-target* )
-(defvar *start-pos* )
-(defvar *start-list* )
-(defvar *num-piece-types* )
-(defvar *move-array* )
-(defvar *moves-by-dir* )
-(defvar *next-cell-by-dir* )
-(defvar *move-type* )
-(defvar *cell-from-coords* )
-(defvar *coords-from-cell* )
-(defvar *all-solutions* )
-(defvar *solution-list* )
-(defvar *first-solution* )
-(defvar *num-cells* )
-(defvar *piece-types* )
-(defvar *linearity-of-piece* )
-(defvar *prim-move-translations* )
-(defvar *prim-move-horizontal-translations* )
-(defvar *prim-move-vertical-translations* )
-(defvar *display-array* )
-(defvar *periodic-fringe-save-list* )
-(defvar *no-printing* )
-(defvar *distant-positions* )
-(defvar *hash-table-pool-stats* )
-(defvar *position-pool-stats* )
-(defvar *fringes-to-reclaim-later* )
-(defvar *exit-row* )
-(defvar *suspend-search* )
-(defvar *rush-hour-level* )
-
-;; This must be set back to nil to do non-Rush-Hour sliding block puzzles
-(defparameter *rush-hour* nil)
-
-(defparameter *careful-mode* nil)
-(defparameter *careful-pools* nil)
-|#
 
 ;; only need these so can compile
 (defparameter *rush-hour* nil)
@@ -1208,31 +1057,6 @@ new-move-spec))
                                           (fringe-list *periodic-fringe-save-list*)
                                           (next-fringe-save-interval 1))
   nil  ;; not needed except to compile
-  #|
-  (let (*solution-target*
-        *fringe-target*
-        *start-pos*
-        *all-solutions*
-        *periodic-fringe-save-list*
-        *no-printing*
-        *start-list*)
-    (loop with full-solution = (list final-pos)
-          for start-pos = final-pos then (first *all-solutions*)
-          for fringe in fringe-list
-          for sub-solution = (slide-solve-engine (list start-pos)
-                                                 nil
-                                                 fringe
-                                                 *move-type*
-                                                 next-fringe-save-interval
-                                                 'first-solution
-                                                 t)       ; no printing
-          do
-          (setf full-solution
-                (append (reverse (cdr sub-solution))
-                        full-solution))
-          finally
-          (return full-solution)))
-  |#
   )
 
 (defun fringe-count (array-of-fringes)
@@ -1243,29 +1067,6 @@ new-move-spec))
         finally
         (return count)))
 
-;; OLD - don't use
-;; recovers and displays
-#|
-(defun fancy-recover-solution (&optional (final-position (first *all-solutions*)))
-  (loop for position in (smart-recover-solution final-position)
-        for move-num from 0
-        do
-        (unless (zerop move-num)
-          (format t "~%~%(move ~a)" move-num))
-        (fancy-display-position position)))
-
-(defun display-solution-list (solution-list)
-  (format t "~%~%Solution positions:~%~a~%"
-          solution-list))
-
-(defun fancy-display-solution-list (solution-list)
-  (loop for position in solution-list
-        for move-num from 0
-        do
-        (unless (zerop move-num)
-          (format t "~%~%(move ~a)" move-num))
-        (fancy-display-position position)))
-|#
 
 ;;; NEW INTERFACE FUNCTION FOR SOLUTION RECOVERY
 
@@ -1848,49 +1649,6 @@ new-move-spec))
 	 (unused-elements (mod  (- count) elems-per-byte)))
     (* 4 unused-elements)))
 
-#|
-;;; **cells-bitint-from-blank-index**  now defined while collecting move-specs ; ;
-		     (defparameter **intermediate-position** nil)       ;; array of SIGNED-BYTES, holding type-code or -1 for NONE ; ;
-		     (defparameter **intermediate-blank-index** nil)    ;; blank-index as integer ; ;
-		     (defparameter **intermediate-used-cells** nil)     ;;  bitint with 1's for filled (used) cells ; ;
-		     |#
-
-
-
-#|
-;;; ALREADY DONE -- stored in **piece-bit-int-array** ; ;
-;;;   Usage:  (aref **piece-bit-int-array** <type> <cell>) ; ;
-
-		     (defun cells-covered-bitint (type ref-cell)
-  ;; don't forget to check if piece actually fits on board ; ;
-(let* ((ref-row-col (aref *coords-from-cell* ref-cell))
-(piece (nth type *piece-types*))    ;; list of row-col pairs covered by piece with ref = (0 0) ; ;
-(translated-piece (translate-piece piece ref-row-col)))
-(loop with bitint = 0
-for (row col) in translated-piece
-for cellnum = (and (array-in-bounds-p *cell-from-coords* row col)
-(aref *cell-from-coords* row col))
-do
-(cond (cellnum
-(incf bitint (ash 1 cellnum)))
-(t
-(return nil)))
-finally
-(return bitint))))
-
-		     (defun compute-cell-cover-bitints-by-type-cell ()
-(setf **jimslide-cell-cover-bitints**
-(make-array (list *num-piece-types* *num-cells*)))
-(loop for type from 0 below *num-piece-types*
-do
-(loop for cell from 0 below *num-cells*
-for cover-bitint = (cells-covered-bitint type cell)
-do
-(setf (aref **jimslide-cell-cover-bitints** type cell)
-cover-bitint))))
-		     |#
-
-;;; compute blank-cells-from-blank-index
 
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;

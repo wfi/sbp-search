@@ -1,6 +1,6 @@
 
-;; reate your own local-config.lisp with settings for at least
-;; the two defparametrs below. **path-to-file-storage** should NOT
+;; Create your own local-config.lisp with settings for at least
+;; the two defparameters below. **path-to-file-storage** should NOT
 ;; be to a solid-state drive (SSD) and should have a trailing slash.
 ;; If you want to automatically start a run, you should add the
 ;; appropriate code to local-config. For example, you might add something like the
