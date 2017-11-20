@@ -89,9 +89,7 @@ Procedure External A*
                         (h-fun **h-fun**)
                         (solved?-fun **solved?-fun**)
                         (successors-fun **successors-fun**)
-                        (h-scale **h-scale**)
                         )
-  (setf **h-scale** h-scale)
   (init-out-buffs) ;; sets up 3 out-buffs (**out-buff-0** **out-buff-1** **out-buff-2**)
   (setf **solution** nil)
   (setf **max-g** g-bound)
@@ -108,12 +106,13 @@ Procedure External A*
                           **final-8bit-byte-position-size**
                           **puzzle-name**
                           **puzzle-directory-name**
-			  **path-to-file-storage**
+                          **path-to-file-storage**
                           **exper-tag**
                           **moves-invertible?**
                           **debug**
-			  **prior-fan?**
-			  **h-scale**
+                          **prior-fan?**
+                          **h-scale**
+                          **max-buffer-position-count**
                           ))
   ;; start-timing
   (start-timing 'elapsed-time)
@@ -212,23 +211,23 @@ Procedure External A*
        with in-buff = (get-bucket-in g-min h-max)
        for pos = (when in-buff (get-front-position in-buff)) then (next-position in-buff)
        while (and pos
-		  (not **solution**))
+                  (not **solution**))
        do
-	 (inc-counter 'expanded-positions)
-					;(print 'before-calling-generate-successors)
-	 (when **debug**
-	   (print 'generating-successors-of-pos)
-	   (princ pos))
-	 (setf sol-pos? (generate-successors pos output-object))
-					;(print 'after-calling-generate-successors)
-	 (when sol-pos?
-	   (setf  **solution** (list sol-pos? (1+ g-min) h-max))      ;; h-max is h-index of parent
-	   (format t "~%FOUND SOLUTION WITH G-VAL = ~a" (1+ g-min)))
+         (inc-counter 'expanded-positions)
+                                        ;(print 'before-calling-generate-successors)
+         (when **debug**
+           (print 'generating-successors-of-pos)
+           (princ pos))
+         (setf sol-pos? (generate-successors pos output-object))
+                                        ;(print 'after-calling-generate-successors)
+         (when sol-pos?
+           (setf  **solution** (list sol-pos? (1+ g-min) h-max))      ;; h-max is h-index of parent
+           (format t "~%FOUND SOLUTION WITH G-VAL = ~a" (1+ g-min)))
 
        finally
-	 (when in-buff
-	   (close-buffer in-buff))
-	 )
+         (when in-buff
+           (close-buffer in-buff))
+         )
     ;; Close-buffers A0, A1, A2
     (when A0
       (close-buffer A0))
@@ -371,10 +370,10 @@ Procedure External A*
      until pos-found?
      do
        (when inbuff
-	 (close-buffer inbuff))
+         (close-buffer inbuff))
      finally
        (when inbuff
-	 (close-buffer inbuff))
+         (close-buffer inbuff))
        (return h)))
 
 ;; only use when moves are INVERTIBLE (not true for SBP <<-- HUH??)
@@ -384,8 +383,8 @@ Procedure External A*
   ;;    since h can only change by at most 1
   (loop
      with h = (if h-index
-		  h-index
-		  (funcall **h-fun** pos))
+                  h-index
+                  (funcall **h-fun** pos))
      with succ-list = (collect-successors pos)   ;; possible parents, since invertible
      with parent = nil
      with parent-h = nil
@@ -395,9 +394,9 @@ Procedure External A*
      until parent
      do
        (when (setf parent (find-parent? succ-list inbuff))
-	 (setf parent-h try-h))
+         (setf parent-h try-h))
        (when inbuff
-	 (close-buffer inbuff))  ;; close inbuff whether or not parent found
+         (close-buffer inbuff))  ;; close inbuff whether or not parent found
      finally
        (return (list parent parent-h))))
 
@@ -406,8 +405,8 @@ Procedure External A*
     (loop for pos = (get-front-position in-buffer) then (next-position in-buffer)
        while pos
        when (member pos poss-parent-list :test **equality-test**)
-	 return (copy-seq pos))))
-		    
+         return (copy-seq pos))))
+                    
 
 (defun count-all-positions ()
   (loop with array-dims = (array-dimensions **open**)
@@ -563,17 +562,20 @@ Procedure External A*
 
 ;; SBP-SETUP
                   
-;; if non-default **h-scale** will be given, must specify max-h here
 (defun sbp-setup-ext-astar (puzzle-selector exper-tag
-                            &optional
-                              (max-g 110)
-                              (max-h (* **h-scale** 50)) ; NOTE: **h-scale** has default value
-                              (h-fun #'sbp-h-fun-from-compressed-pos)
-                              )
+                            &key
+                            (max-g 110)
+                            (h-scale **h-scale**)
+                            (max-h (* h-scale 50)) ; NOTE: **h-scale** has default value
+                            (prior-fan? (> h-scale 1))
+                            (h-fun #'sbp-h-fun-from-compressed-pos)
+                            )
   (sbp-exper puzzle-selector exper-tag)  ;; among other things, sets up **puzzle-directory-name**
   ;; setup globals for External-A-star
   (setf **max-g** max-g
+        **h-scale** h-scale
         **max-h** max-h
+        **prior-fan?** prior-fan?
         **init-position** (first **start-pos-list**)
         **h-fun** h-fun
         ;; **solved?-fun** nil   ;; don't call in ext-a-star (use sbp-7 code to check for solved)

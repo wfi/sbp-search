@@ -515,7 +515,7 @@
 			(new-blanks-index **intermediate-blank-index**)
 			(intermediate-pos **intermediate-position**)
 			(t-piece-type **t-piece-type**))
-  (* **h-scale**
+  (* **h-scale** 2
   (loop for cell-index from 0
         for type-val across intermediate-pos
         until (= type-val t-piece-type)
