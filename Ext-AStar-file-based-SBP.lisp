@@ -87,7 +87,6 @@ Procedure External A*
                         (g-bound **max-g**)
                         (h-bound **max-h**)
                         (h-fun **h-fun**)
-                        (solved?-fun **solved?-fun**)
                         (successors-fun **successors-fun**)
                         )
   (init-out-buffs) ;; sets up 3 out-buffs (**out-buff-0** **out-buff-1** **out-buff-2**)
@@ -95,7 +94,6 @@ Procedure External A*
   (setf **max-g** g-bound)
   (setf **max-h** h-bound)
   (setf **successors-fun** successors-fun)
-  (setf **solved?-fun** solved?-fun)
   ;; print parameter info
   (print-parameter-info '(**init-position**
                           **max-g**
@@ -578,7 +576,6 @@ Procedure External A*
         **prior-fan?** prior-fan?
         **init-position** (first **start-pos-list**)
         **h-fun** h-fun
-        ;; **solved?-fun** nil   ;; don't call in ext-a-star (use sbp-7 code to check for solved)
         ;; **successors-fun** nil ;; don't call -- generate-successors is hard-wired here
         **equality-test** #'equalp)
   ;; MORE SETUP (ADAPTED FROM FILE-SEARCH-ENGINE-SETUP)
@@ -682,7 +679,6 @@ Procedure External A*
         **init-position** start
         **bit-flip-target** target
         **h-fun** #'bit-flip-h-val
-        **solved?-fun** #'bit-flip-solved?
         **successors-fun** #'bit-flip-successors
         **equality-test** #'eql))
 
@@ -727,7 +723,6 @@ Procedure External A*
         **init-position** start
         **bit-flip-2-target** target
         **h-fun** #'bit-flip-2-h-val
-        **solved?-fun** #'bit-flip-2-solved?
         **successors-fun** #'bit-flip-2-successors
         **bit-flip-2-moves** (bit-flip-2-moves)
         **equality-test** #'eql))
@@ -856,7 +851,6 @@ Procedure External A*
         ;; for external-a-star
         **init-position** start
         **h-fun** #'6-puzzle-h-val
-        **solved?-fun** #'6-puzzle-solved?
         **successors-fun** #'6-puzzle-successors
         **equality-test** #'equalp
         ))
@@ -979,7 +973,6 @@ Procedure External A*
         ;; for external-a-star
         **init-position** start
         **h-fun** #'8-puzzle-h-val
-        **solved?-fun** #'8-puzzle-solved?
         **successors-fun** #'8-puzzle-successors
         **equality-test** #'equalp
         ))
