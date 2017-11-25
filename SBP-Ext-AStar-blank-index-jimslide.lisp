@@ -512,21 +512,21 @@
 
 ;;; T-PIECE H-FUN
 (defun t-piece-h-fun (&optional
-			(new-blanks-index **intermediate-blank-index**)
-			(intermediate-pos **intermediate-position**)
-			(t-piece-type **t-piece-type**))
-  (* **h-scale** 2
-  (loop for cell-index from 0
-        for type-val across intermediate-pos
-        until (= type-val t-piece-type)
-        finally
+                      (new-blanks-index **intermediate-blank-index**)
+                      (intermediate-pos **intermediate-position**)
+                      (t-piece-type **t-piece-type**))
+  (* **h-scale**
+     (loop for cell-index from 0
+           for type-val across intermediate-pos
+           until (= type-val t-piece-type)
+           finally
                                         ;(print (list type-val cell-index))
-        (return 
-                   (+ (aref **t-piece-hfun-component** cell-index)
-                      (t-piece-hfun-blanks-offset cell-index
-                                                  (aref **cells-bitint-from-blank-index**
-                                                        new-blanks-index))
-                   )))))
+           (return 
+            (+ (aref **t-piece-hfun-component** cell-index)
+               (t-piece-hfun-blanks-offset cell-index
+                                           (aref **cells-bitint-from-blank-index**
+                                                 new-blanks-index))
+               )))))
 
 (defun t-piece-hfun-blanks-offset (t-cellnum blank-bits)
   (loop with (default-val . mask-form-list) = (aref **blanks-mask-lists** t-cellnum)
