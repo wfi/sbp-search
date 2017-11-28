@@ -445,8 +445,9 @@
 	       ;; (print "SUCCESSOR:")
 	       ;; (fancy-display-compressed-position **sbp-position-register**)
                ;; (write-position output-buffer **sbp-position-register**)
-               (let ((succ-h (t-piece-h-fun new-blanks-index
-                                            **intermediate-position**))
+               (let ((succ-h (* **h-scale**
+                                (t-piece-h-fun new-blanks-index
+                                               **intermediate-position**)))
                      (succ-pos **sbp-position-register**)) ;; don't need to copy with write-to-file
                  (let ((x (- succ-h h-max)))
                    (cond ((> x 0) (write-position A2 succ-pos))
@@ -515,18 +516,17 @@
                       (new-blanks-index **intermediate-blank-index**)
                       (intermediate-pos **intermediate-position**)
                       (t-piece-type **t-piece-type**))
-  (* **h-scale**
-     (loop for cell-index from 0
-           for type-val across intermediate-pos
-           until (= type-val t-piece-type)
-           finally
+  (loop for cell-index from 0
+        for type-val across intermediate-pos
+        until (= type-val t-piece-type)
+        finally
                                         ;(print (list type-val cell-index))
-           (return 
-            (+ (aref **t-piece-hfun-component** cell-index)
-               (t-piece-hfun-blanks-offset cell-index
-                                           (aref **cells-bitint-from-blank-index**
-                                                 new-blanks-index))
-               )))))
+        (return 
+         (+ (aref **t-piece-hfun-component** cell-index)
+            (t-piece-hfun-blanks-offset cell-index
+                                        (aref **cells-bitint-from-blank-index**
+                                              new-blanks-index))
+            ))))
 
 (defun t-piece-hfun-blanks-offset (t-cellnum blank-bits)
   (loop with (default-val . mask-form-list) = (aref **blanks-mask-lists** t-cellnum)
