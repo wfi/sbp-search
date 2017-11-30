@@ -1,21 +1,22 @@
 
 
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;;; IMPLEMENT MANHATTAN MOVE H-FUN FOR CLIMB15A and CLIMB24
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;; IMPLEMENT MANHATTAN MOVE H-FUN FOR CLIMB12, CLIMB15A, and CLIMB24
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 ;;; PLAN:
 ;;;  (setup-data-for-manhattan-move-h-fun <solution-target-position>)
 ;;;    This precomputes (for the target-solution-position) a mapping for each piece-type:
 ;;;      Mapping piece-index -> minimum-match-move-dist to given targets in solution
+;;;    It also sets **target-position** to the supplied <solution-target-position>
+;;;      When non-nil this causes A* search code to use the fast-manhattan-move-h-fun
+;;;          instead of the t-piece-h-fun
 ;;;  Then to evaluate h-fun:
 ;;;   (fast-manhattan-move-h-fun)
 ;;;     which operates on **intermediate-position**
-;;;      by scanning intermediate the intermediate-position vector
-;;;      to recover the piece-indices for each piece-type
-;;;     then
-;;;      sums the precomputed match-move-dist for each piece-type
-;;;       and returns this sum
+;;;      by scanning the intermediate-position vector
+;;;       summing the precomputed match-move-dist for each piece-type
+;;;         and returns the sum of these over all piece-types
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; UTILITIES
@@ -78,6 +79,26 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 #|
+
+For Climb12 puzzle:
+
+Type-num     Piece-descrip.   Multiplicity   Hor.   Vert    Hor,vert
+;; 0             x x   NW         1            2      2        1,1           
+;;               x
+
+;; 1               x   SE         1            2      2        1,1
+;;               x x
+
+;; 2             x                2            2      4        1,2
+;;               x
+
+;; 3             x x              2            4      2        2,1
+
+;; 4               x    T         1            2      1        1,1
+;;               x x x
+
+;; 5             x                4            4      4        1,3 or 2,2 or 3,1
+
 
 For Climb15a puzzle:
 
@@ -155,6 +176,16 @@ Type-num     Piece-descrip.   Multiplicity   Hor.   Vert    Hor,vert
 (defparameter **piece-type-move-data**
   nil)
 
+(defparameter **climb12-piece-type-move-data**
+  ;; element-format: (type-num simple-md? hor-comb vert-comb hor-only vert-only
+  '((0 2 1 1 2 2)     ;; NW
+    (1 2 1 1 2 2)     ;; SE
+    (2 nil 1 2 2 4)   ;; 2x1 Vert Rect
+    (3 nil 2 1 4 2)   ;; 1x2 Hor Rect
+    (4 nil 1 1 2 1)   ;; T
+    (5 4 2 2 4 4)     ;; 1x1 Singleton
+    ))
+
 (defparameter **climb15a-piece-type-move-data**
   ;; element-format: (type-num simple-md? hor-comb vert-comb hor-only vert-only
   '((0 2 1 1 2 2)     ;; 2x2
@@ -166,7 +197,7 @@ Type-num     Piece-descrip.   Multiplicity   Hor.   Vert    Hor,vert
     (6 nil 2 1 4 2)   ;; 1x2 Hor Rect
     (7 nil 1 1 2 1)   ;; T
     (8 4 2 2 4 4)     ;; 1x1 Singleton
-    )  )
+    ))
 
 
 
@@ -184,14 +215,17 @@ Type-num     Piece-descrip.   Multiplicity   Hor.   Vert    Hor,vert
     ))
 
 (defun set-piece-type-move-data-for-puzzle-type (puzzle-name)
-  (cond ((string-equal puzzle-name "CLIMB15A")
+  (cond ((string-equal puzzle-name "CLIMB12")
 	 (setf **piece-type-move-data**
-	       **climb15a-piece-type-move-data**))
-	((string-equal puzzle-name "CLIMB24")
-	 (setf **piece-type-move-data**
-	       **climb24-piece-type-move-data**))
-	(t (error "unknown puzzle-name ~a" puzzle-name))
-	))
+	       **climb12-piece-type-move-data**))
+        ((string-equal puzzle-name "CLIMB15A")
+         (setf **piece-type-move-data**
+               **climb15a-piece-type-move-data**))
+        ((string-equal puzzle-name "CLIMB24")
+         (setf **piece-type-move-data**
+               **climb24-piece-type-move-data**))
+        (t (error "unknown puzzle-name ~a" puzzle-name))
+        ))
 
 (defparameter **cell-to-cell-row-col-distances**
   nil)
@@ -340,7 +374,7 @@ Type-num     Piece-descrip.   Multiplicity   Hor.   Vert    Hor,vert
   nil)
 
 (defun setup-data-for-manhattan-move-h-fun (&optional
-					      (target-position **target-position**))
+                                              (target-position **target-position**))
   ;;; preliminaries
   (setup-permutation-lists)
   (setf **target-position** target-position)
@@ -405,28 +439,38 @@ Type-num     Piece-descrip.   Multiplicity   Hor.   Vert    Hor,vert
 ;;; COMPUTING MANHATTAN-MOVE-H-FUN for a SUCCESSOR-POSITION
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-;;; for testing (climb24-sol-231)
-(defparameter **climb24-sol-231**
-  '(#(19171737 2003391846 1116091728 341054) 231 26))
+;; CLIMB24 Solution Targets
+(defparameter **climb24-target-230**
+  #(110270073 1116033380 1989367168 341054))
 
 (defparameter **climb24-target-231**
   #(19171737 2003391846 1116091728 341054))
 
-(defparameter **climb15a-sol-104**
-  '(#(1971882004 593823232 23750) 104 40))
+(defparameter **climb24-target-249**
+  #(110270326 1502164246 1115972944 341054))    ;;  249 sol-pos from hscale=8
 
-(defparameter **climb15a-target-104**
+
+;; CLIMB15a Solution Targets
+(defparameter **climb15a-target-104**  ;; same sol-pos for hscale = 1,2?,3,5,6,7,8,9,12,13,14
   #(1971882004 593823232 23750))
 
-(defparameter **climb15a-solution-109**
-  '(#(1971882004 593823232 23750) 109 53))
+(defparameter **climb15a-target-116**  ;; from solution with h-scale = 4
+  #(2022203778 893408768 23750))
 
-(defparameter **climb15a-target-109**
-  #(1971882004 593823232 23750))
+(defparameter **climb15a-target-187-scale10**  ;; from solution with h-scale = 10
+  #(2022188388 890766848 27404))
+
+(defparameter **climb15a-target-187-scale11**  ;; from solution with h-scale = 11
+  #(2022188133 1451234048 23750))
+
+;; CLIMB12 Solution Targets
+(defparameter **climb12-target-59**
+  #(1163206709 305135616 4844))
+
 
 ;;; when uncompressing position:
 					;    (fill **piece-type-ints** 0)
-;;;    when placing piecetype PT in index I:
+;;; when placing piecetype PT in index I:
 					;    (incf (aref **piece-type-ints** PT)
 					;          (ash 1 I))
 
@@ -482,16 +526,16 @@ Type-num     Piece-descrip.   Multiplicity   Hor.   Vert    Hor,vert
 (defun setup-fast-manhattan-move-h-fun-data ()
   ;; assume **targets-by-piece-type** already setup
   (setf **k-values-working-array**
-	(make-array (length **targets-by-piece-type**))
-	**k-values-source-array**
-	(make-array (length **targets-by-piece-type**))
-	**sum-values-working-array**
-	(make-array (length **targets-by-piece-type**)))
+        (make-array (length **targets-by-piece-type**))
+        **k-values-source-array**
+        (make-array (length **targets-by-piece-type**))
+        **sum-values-working-array**
+        (make-array (length **targets-by-piece-type**)))
   (loop for target-list across **targets-by-piece-type**
      for piece-type from 0
      do
        (setf (aref **k-values-source-array** piece-type)
-	     (length target-list)))
+             (length target-list)))
   )
 
 (defun fast-manhattan-move-h-fun ()
@@ -522,18 +566,4 @@ Type-num     Piece-descrip.   Multiplicity   Hor.   Vert    Hor,vert
 	     piece-index))
   )
 
-
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;;; KLUDGE for testing -- redefine t-piece-h-fun here to overwrite "normal" definition
-;;;   REMOVE THIS when integrating into actual master branch
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-
-
-(defun t-piece-h-fun (&optional   ;; ignore these optional args
-			(new-blanks-index **intermediate-blank-index**)
-			(intermediate-pos **intermediate-position**)
-			(t-piece-type **t-piece-type**))
-  (* **h-scale** ; 2
-     (fast-manhattan-move-h-fun)
-     ))
 

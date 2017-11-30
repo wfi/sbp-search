@@ -6,4 +6,5 @@
 (compile-file "Ext-AStar-file-based-SBP")
 (compile-file "SBP-Ext-AStar-blank-index-jimslide")
 (compile-file "slide-puzzle-inits")
+(compile-file "manh-move-h-fun")
 

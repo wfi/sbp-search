@@ -18,3 +18,4 @@
 (load "Ext-AStar-file-based-SBP")
 (load "SBP-Ext-AStar-blank-index-jimslide")
 (load "slide-puzzle-inits")
+(load "manh-move-h-fun")

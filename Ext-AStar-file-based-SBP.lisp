@@ -27,25 +27,27 @@
 PSEUDO CODE:
 
 Procedure External A*
-   Open(0, h(I)) ← {I}
-   fmin ← h(I)
-   while (fmin != ∞)
-      gmin ← min{i | Open(i, fmin − i) 6= ∅}
-      while (gmin ≤ fmin)
-         hmax ← fmin − gmin
-         A(fmin), A(fmin + 1), A(fmin + 2) ← N(Open(gmin, hmax))
-         Open(gmin + 1, hmax + 1) ← A(fmin + 2)
-         Open(gmin + 1, hmax) ← A(fmin + 1) ∪ Open(gmin + 1, hmax)
-         Open(gmin + 1, hmax − 1) ← A(fmin) ∪ Open(gmin + 1, hmax − 1)
-         Open(gmin + 1, hmax − 1) ← remove duplicates from Open(gmin + 1, hmax − 1)
-         Open(gmin + 1, hmax − 1) ← Open(gmin + 1, hmax − 1)\
-                                       (Open(gmin, hmax − 1) ∪ Open(gmin − 1, hmax − 1))
-         gmin ← gmin + 1
-      fmin ← min{i + j > fmin | Open(i, j) != ∅} ∪ {∞}
+Open(0, h(I)) ← {I}
+fmin ← h(I)
+while (fmin != ∞)
+gmin ← min{i | Open(i, fmin − i) 6= ∅}
+while (gmin ≤ fmin)
+hmax ← fmin − gmin
+A(fmin), A(fmin + 1), A(fmin + 2) ← N(Open(gmin, hmax))
+Open(gmin + 1, hmax + 1) ← A(fmin + 2)
+Open(gmin + 1, hmax) ← A(fmin + 1) ∪ Open(gmin + 1, hmax)
+Open(gmin + 1, hmax − 1) ← A(fmin) ∪ Open(gmin + 1, hmax − 1)
+Open(gmin + 1, hmax − 1) ← remove duplicates from Open(gmin + 1, hmax − 1)
+Open(gmin + 1, hmax − 1) ← Open(gmin + 1, hmax − 1)\
+(Open(gmin, hmax − 1) ∪ Open(gmin − 1, hmax − 1))
+gmin ← gmin + 1
+fmin ← min{i + j > fmin | Open(i, j) != ∅} ∪ {∞}
 |#
 
 
 (defparameter **h-scale** 1)
+(defparameter **target-position**     ;; if non-nil used as manh-move-h-fun target
+  nil)                                ;;  gets set in  setup-data-for-manhattan-move-h-fun
 
 (defparameter **open** nil)
 (defparameter **solution** nil)
@@ -83,12 +85,12 @@ Procedure External A*
 ;;; Main search funtion
 
 (defun external-a-star (&key
-                        (initial-position **init-position**)
-                        (g-bound **max-g**)
-                        (h-bound **max-h**)
-                        (h-fun **h-fun**)
-                        (successors-fun **successors-fun**)
-                        )
+                          (initial-position **init-position**)
+                          (g-bound **max-g**)
+                          (h-bound **max-h**)
+                          (h-fun **h-fun**)
+                          (successors-fun **successors-fun**)
+                          )
   (init-out-buffs) ;; sets up 3 out-buffs (**out-buff-0** **out-buff-1** **out-buff-2**)
   (setf **solution** nil)
   (setf **max-g** g-bound)
@@ -111,83 +113,87 @@ Procedure External A*
                           **prior-fan?**
                           **h-scale**
                           **max-buffer-position-count**
+                          **target-position**    ;; used to select h-fun type
                           ))
+  ;; if **target-position** display the position in ascii art
+  (when **target-position**
+    (fancy-display-compressed-position **target-position**))
   ;; start-timing
   (start-timing 'elapsed-time)
   (loop with open = (make-array (list (1+ g-bound) (1+ h-bound))
                                 :initial-element nil)
-        with init-h-val = (funcall h-fun initial-position)
-        with f-max = (+ g-bound h-bound) ;; max-f for open array at g-bound, h-bound  (was -2 before)
-        with f-min = init-h-val
-        with g-min = nil
-        with h-max = nil
-        initially
-        (setf **open** open) ;; make available for debugging
-        (setf **open-delete-counts**
-              (make-array (array-dimensions open) :initial-element 0))
-        (setf **open-create-sizes**
-              (make-array (array-dimensions open) :initial-element nil))
-        (setf **open-delete-sizes**
-              (make-array (array-dimensions open) :initial-element nil))
-        (store-bucket initial-position 0 init-h-val)
-        while (and (not **solution**)
-                   (not (eql f-min 'infinity)))
-        do
-        (print 'start-outer-loop)
-        (setf g-min
-              (loop for i from 0 below g-bound
-                    ;; min{i | Open(i, fmin − i) 6= ∅}
-                    unless (empty-bucket? i (- f-min i)) ;; empty-bucket? checks for array-in-bounds-p
-                    return i))
+     with init-h-val = (funcall h-fun initial-position)
+     with f-max = (+ g-bound h-bound) ;; max-f for open array at g-bound, h-bound  (was -2 before)
+     with f-min = init-h-val
+     with g-min = nil
+     with h-max = nil
+     initially
+       (setf **open** open) ;; make available for debugging
+       (setf **open-delete-counts**
+             (make-array (array-dimensions open) :initial-element 0))
+       (setf **open-create-sizes**
+             (make-array (array-dimensions open) :initial-element nil))
+       (setf **open-delete-sizes**
+             (make-array (array-dimensions open) :initial-element nil))
+       (store-bucket initial-position 0 init-h-val)
+     while (and (not **solution**)
+                (not (eql f-min 'infinity)))
+     do
+       (print 'start-outer-loop)
+       (setf g-min
+             (loop for i from 0 below g-bound
+                ;; min{i | Open(i, fmin − i) 6= ∅}
+                unless (empty-bucket? i (- f-min i)) ;; empty-bucket? checks for array-in-bounds-p
+                return i))
                                         ;(setf g-min (max (1- g-min) 0))   ;; Kludge to try force dup elims that were missed
-        (format t "~% g-min = ~a" g-min)
-        (format t "~% f-min = ~a" f-min)
-        (loop 
-         while (and (<= g-min f-min)
-                    (not **solution**))
-         do
-         ;; hmax ← fmin − gmin
-         (setf h-max (- f-min g-min))
-         (format t "~% h-max = ~a" h-max)
-         (report-all-timers)
-         ;; A(fmin), A(fmin + 1), A(fmin + 2) ← N(Open(gmin, hmax))
-         ;; A0, A1, A2
-         ;;(g h write-segments? out-buff-to-repoint)
+       (format t "~% g-min = ~a" g-min)
+       (format t "~% f-min = ~a" f-min)
+       (loop 
+          while (and (<= g-min f-min)
+                     (not **solution**))
+          do
+          ;; hmax ← fmin − gmin
+            (setf h-max (- f-min g-min))
+            (format t "~% h-max = ~a" h-max)
+            (report-all-timers)
+          ;; A(fmin), A(fmin + 1), A(fmin + 2) ← N(Open(gmin, hmax))
+          ;; A0, A1, A2
+          ;;(g h write-segments? out-buff-to-repoint)
 
-         (expand-bucket g-min h-max)
+            (expand-bucket g-min h-max)
 
 
-         ;;gmin ← gmin + 1
-         (incf g-min)
-         (format t "~% Inc g-min to ~a" g-min)
-         )
+          ;;gmin ← gmin + 1
+            (incf g-min)
+            (format t "~% Inc g-min to ~a" g-min)
+            )
        
-        ;; fmin ← min{i + j > fmin | Open(i, j) != ∅} ∪ {∞}
-        (unless **solution**
-          (let ((old-f-min f-min))
-            (setf f-min
-                  (loop with min-f = 'infinity
-                        for try-f from (1+ f-min) to f-max
-                        while (eql min-f 'infinity)
-                        do
-                        (loop for i from 0 to (min (1- g-bound) try-f)
-                              for j = (- try-f i)
-                              when (not (empty-bucket? i j)) ;; this checks array-in-bounds-p
-                              ;; (and (<= i g-bound)   ;; allow equality
-                              ;;     (<= j h-bound)   ;; allow equality
-                              ;;   (not (empty-bucket? i j)))
-                              do
-                              (setf min-f try-f))
-                        finally
-                        (return min-f)))
-            ;; delete buckets from (old-f-min - 2) to (f-min - 3)
-            (clear-open-bucket-diagonals (- old-f-min 2) (- f-min 3))
-            ))
-        (format t "~% End Pass Through Outer Loop, New F-MIN = ~a" f-min)
-        finally
-        (report-all-timers)
-        (return **solution**)
-        ))
+     ;; fmin ← min{i + j > fmin | Open(i, j) != ∅} ∪ {∞}
+       (unless **solution**
+         (let ((old-f-min f-min))
+           (setf f-min
+                 (loop with min-f = 'infinity
+                    for try-f from (1+ f-min) to f-max
+                    while (eql min-f 'infinity)
+                    do
+                      (loop for i from 0 to (min (1- g-bound) try-f)
+                         for j = (- try-f i)
+                         when (not (empty-bucket? i j)) ;; this checks array-in-bounds-p
+                         ;; (and (<= i g-bound)   ;; allow equality
+                         ;;     (<= j h-bound)   ;; allow equality
+                         ;;   (not (empty-bucket? i j)))
+                         do
+                           (setf min-f try-f))
+                    finally
+                      (return min-f)))
+           ;; delete buckets from (old-f-min - 2) to (f-min - 3)
+           (clear-open-bucket-diagonals (- old-f-min 2) (- f-min 3))
+           ))
+       (format t "~% End Pass Through Outer Loop, New F-MIN = ~a" f-min)
+     finally
+       (report-all-timers)
+       (return **solution**)
+       ))
 
 ;;; EXPAND BUCKET
 ;;;   This now triggers the merge before expanding
@@ -562,13 +568,14 @@ Procedure External A*
                   
 (defun sbp-setup-ext-astar (puzzle-selector exper-tag
                             &key
-                            (max-g 110)
-                            (h-scale **h-scale**)
-                            (max-h (* h-scale 50)) ; NOTE: **h-scale** has default value
-                            (prior-fan? (> h-scale 1))
-                            (h-fun #'sbp-h-fun-from-compressed-pos)
-                            )
-  (sbp-exper puzzle-selector exper-tag)  ;; among other things, sets up **puzzle-directory-name**
+                              (max-g 110)
+                              (h-scale **h-scale**)
+                              (max-h (* h-scale 50)) ; NOTE: **h-scale** has default value
+                              (prior-fan? (> h-scale 1))
+                              (h-fun #'sbp-h-fun-from-compressed-pos)
+                              h-fun-target-pos
+                              )
+  (sbp-exper puzzle-selector exper-tag) ;; among other things, sets up **puzzle-directory-name**
   ;; setup globals for External-A-star
   (setf **max-g** max-g
         **h-scale** h-scale
@@ -577,11 +584,12 @@ Procedure External A*
         **init-position** (first **start-pos-list**)
         **h-fun** h-fun
         ;; **successors-fun** nil ;; don't call -- generate-successors is hard-wired here
-        **equality-test** #'equalp)
+        **equality-test** #'equalp
+        **target-position** h-fun-target-pos)
   ;; MORE SETUP (ADAPTED FROM FILE-SEARCH-ENGINE-SETUP)
   ;; Check Puzzle is initialized (shared globals all ok)
   (unless
-      (and **puzzle-name**   ;; puzzle-name   (only nil if it hasn't been set by puzzle initialization)
+      (and **puzzle-name** ;; puzzle-name   (only nil if it hasn't been set by puzzle initialization)
            (and **position-size**
                 (integerp **position-size**)
                 (> **position-size** 0))
@@ -591,7 +599,7 @@ Procedure External A*
   ;; ensure puzzle-directory exits
   (ensure-directories-exist (puzzle-directory-pathname))
   ;; Calculate position size in 8-bit bytes (using **position-size** and **byte-size**)
-  (setf **final-8bit-byte-position-size**     ;; needed to calculate position counts for fringe files
+  (setf **final-8bit-byte-position-size** ;; needed to calculate position counts for fringe files
         (* **position-size** (ceiling **byte-size** 8)))
   ;; Set candidate-position-register for use by merge-segments
   (setf **candidate-position-register**
@@ -604,7 +612,7 @@ Procedure External A*
       (fill **free-input-buffers** nil))) ;; need to allocate new inbuffs with correct position sizes
   ;; if directory is non-empty ask if should be cleared before search
   (let ((puzzle-directory-files (puzzle-directory-file-list)))
-    (when (and T    ;; was (not search-restart?)  no restart implemented yet
+    (when (and T ;; was (not search-restart?)  no restart implemented yet
                puzzle-directory-files)
       (warn "(Ext-AStar-file-based-SBP:sbp-setup-ext-astar): Files already exist in puzzle directory")
       (pprint puzzle-directory-files)
@@ -612,9 +620,9 @@ Procedure External A*
           ;; NOTE: this will delete all files starting with "." as well!  (maybe should omit deleting those?)
           ;;    Seems if there are sub-directories, will not delete those (even if they are empty)
           (loop for filepath in puzzle-directory-files
-                do
-                (delete-file filepath))
-        (error "aborting -- not safe to do new search with non-empty puzzle directory"))))
+             do
+               (delete-file filepath))
+          (error "aborting -- not safe to do new search with non-empty puzzle directory"))))
 
   ;; setup timers
   (loop for timer-name in '(ELAPSED-TIME
@@ -624,20 +632,30 @@ Procedure External A*
                             EXPAND-WRITE-BUFFER
                             REDUCE
                             REDUCE-WRITE-BUFFER)
-       do
+     do
        (allow-timing timer-name)
-       (reset-timer timer-name))   ;; now does reset  (since start-timing doesn't reset accumulator)
+       (reset-timer timer-name)) ;; now does reset  (since start-timing doesn't reset accumulator)
   ;; setup counters
   (allow-counting 'all-successors)
   (allow-counting 'expanded-positions)
   ;; reset counters
   (reset-counter 'all-successors)
   (reset-counter 'expanded-positions)
+  ;; setup manhattan-move-h-fun if target supplied
+  (when h-fun-target-pos
+    (setup-data-for-manhattan-move-h-fun h-fun-target-pos))
   )
 
-(defun sbp-h-fun-from-compressed-pos (compressed-pos)
+;; this now includes scaling, and branches on **target-position** to select h-fun to use
+;; can recover "raw (underlying) h-fun value" by supplying 1 as the optional hscale argument
+(defun sbp-h-fun-from-compressed-pos (compressed-pos &optional (hscale **h-scale**))
   (jimslide-uncompress compressed-pos)
-  (t-piece-h-fun) ;; uses **intermediate-position**
+  (cond (**target-position** ;; use fast-manhattan-move-h-fun
+         (* hscale
+            (fast-manhattan-move-h-fun))) ;; uses **intermediate-position**
+        (t ;; use original t-piece-h-fun
+         (* hscale
+            (t-piece-h-fun)))) ;; uses **intermediate-position**
   )
 
 
