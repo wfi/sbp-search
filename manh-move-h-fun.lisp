@@ -440,14 +440,20 @@ Type-num     Piece-descrip.   Multiplicity   Hor.   Vert    Hor,vert
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 ;; CLIMB24 Solution Targets
-(defparameter **climb24-target-230**
+(defparameter **climb24-target-230**            ;; 230 sol-pos from hscale = 4
   #(110270073 1116033380 1989367168 341054))
 
-(defparameter **climb24-target-231**
+(defparameter **climb24-target-231**            ;; 231 sol-pos from hscale = 5
   #(19171737 2003391846 1116091728 341054))
 
-(defparameter **climb24-target-249**
-  #(110270326 1502164246 1115972944 341054))    ;;  249 sol-pos from hscale=8
+(defparameter **climb24-target-253**            ;; 253 sol-pos from hscale = 6
+  #(26834792 2455069746 1750488208 341054))
+
+(defparameter **climb24-target-256**            ;; 256 sol-pos from hscale = 7
+  #(26646167 2304255606 877929808 316250))
+
+(defparameter **climb24-target-249**            ;; 249 sol-pos from hscale = 8
+  #(110270326 1502164246 1115972944 341054))    
 
 
 ;; CLIMB15a Solution Targets
