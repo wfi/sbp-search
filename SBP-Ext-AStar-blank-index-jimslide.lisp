@@ -111,8 +111,10 @@
 
 (defparameter **start-domain-pos-list** nil)      ;; for locally storing uncompressed start-positios-list
 
-(defparameter **compressed-solution-position** nil)  ;; COMPRESSED SOLUTION POSITION 
-                                                 ;;  (should be set by (GENERATE-SUCCESSORS <position>) when (SOLVED? <some-successor>)
+;; DON'T USE -- changed GENERATE-SUCCESSORS to save solution internally
+(defparameter **compressed-solution-position**  ;; COMPRESSED SOLUTION POSITION 
+  nil)  ;;  (should be set by (GENERATE-SUCCESSORS <position>) when (SOLVED? <some-successor>)
+
 (defparameter **compressed-solution-target** nil)  ;; This is the "compressed" equivalent of *solution-target*  [format:  (list (byte-index byte-val) ... ) ]
 (defparameter **check-solved?** t)     ;; T = normal search, set to NIL = exhaustive or reverse-search from solutions
 
@@ -417,6 +419,7 @@
 (defun generate-successors (position output-buffer &optional (check-solved? **check-solved?**))
   ;; position is expected to be a byte-position in register:  **sbp-position-register**
   ;; OOPS - its not in that register!  [it's actually a front-position of an input buffer - better not modify it!]
+  (setf **compressed-solution-position** nil) ;; reset for case of continuous search
   ;; uncompress position
   (jimslide-uncompress position) ;; target is **intermediate-position** and **intermediate-blank-index**
   (loop ; with source-blank-index = (extract-index-from-byte-seq position) ; now **intermediate-blank-index**
@@ -469,7 +472,7 @@
        )
   ;; return solution if 1 has been found
   (cond (**compressed-solution-position**
-         (copy-seq **compressed-solution-position**))  ;; return copy of compressed copy of solution, if one found (copy to prevent getting clobbered)
+         **compressed-solution-position**)  ;; return compressed solution, if one found (already copied above when set)
         (t nil)))                         ;; otherwise NIL
 
 

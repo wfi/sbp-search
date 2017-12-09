@@ -51,6 +51,11 @@ fmin ← min{i + j > fmin | Open(i, j) != ∅} ∪ {∞}
 
 (defparameter **open** nil)
 (defparameter **solution** nil)
+;; Continuous Search
+(defparameter **g-cutoff** nil)
+(defparameter **continuous-search-solutions** nil)
+(defparameter **keep-searching?** t)
+
 (defparameter **open-delete-counts** nil)
 (defparameter **open-create-sizes** nil)
 (defparameter **open-delete-sizes** nil)
@@ -93,6 +98,7 @@ fmin ← min{i + j > fmin | Open(i, j) != ∅} ∪ {∞}
                           )
   (init-out-buffs) ;; sets up 3 out-buffs (**out-buff-0** **out-buff-1** **out-buff-2**)
   (setf **solution** nil)
+  (setf **continuous-search-solutions** nil)
   (setf **max-g** g-bound)
   (setf **max-h** h-bound)
   (setf **successors-fun** successors-fun)
@@ -114,6 +120,8 @@ fmin ← min{i + j > fmin | Open(i, j) != ∅} ∪ {∞}
                           **h-scale**
                           **max-buffer-position-count**
                           **target-position**    ;; used to select h-fun type
+                          **g-cutoff**
+                          **keep-searching?**
                           ))
   ;; if **target-position** display the position in ascii art
   (when **target-position**
@@ -215,7 +223,10 @@ fmin ← min{i + j > fmin | Open(i, j) != ∅} ∪ {∞}
        with in-buff = (get-bucket-in g-min h-max)
        for pos = (when in-buff (get-front-position in-buff)) then (next-position in-buff)
        while (and pos
-                  (not **solution**))
+                  (not **solution**)
+                  (or (not **g-cutoff**)
+                      (<= g-min **g-cutoff**))
+                  )
        do
          (inc-counter 'expanded-positions)
                                         ;(print 'before-calling-generate-successors)
@@ -226,7 +237,13 @@ fmin ← min{i + j > fmin | Open(i, j) != ∅} ∪ {∞}
                                         ;(print 'after-calling-generate-successors)
          (when sol-pos?
            (setf  **solution** (list sol-pos? (1+ g-min) h-max))      ;; h-max is h-index of parent
-           (format t "~%FOUND SOLUTION WITH G-VAL = ~a" (1+ g-min)))
+           (format t "~%FOUND SOLUTION WITH G-VAL = ~a" (1+ g-min))
+           (format t "~%   SOLUTION:  ~a" **solution**)
+           (push **solution** **continuous-search-solutions**)
+           (when **keep-searching?**
+             (setf **solution** nil)
+             (setf **g-cutoff** g-min)  ;; cutoff is 1 less than best solution found
+             (format t "~% Setting **g-cutoff** to ~a" **g-cutoff**)))
 
        finally
          (when in-buff
@@ -574,6 +591,7 @@ fmin ← min{i + j > fmin | Open(i, j) != ∅} ∪ {∞}
                               (prior-fan? (> h-scale 1))
                               (h-fun #'sbp-h-fun-from-compressed-pos)
                               h-fun-target-pos
+                              g-cutoff    ;; can be integer to prune by max allowed sol-length
                               )
   (sbp-exper puzzle-selector exper-tag) ;; among other things, sets up **puzzle-directory-name**
   ;; setup globals for External-A-star
@@ -585,7 +603,8 @@ fmin ← min{i + j > fmin | Open(i, j) != ∅} ∪ {∞}
         **h-fun** h-fun
         ;; **successors-fun** nil ;; don't call -- generate-successors is hard-wired here
         **equality-test** #'equalp
-        **target-position** h-fun-target-pos)
+        **target-position** h-fun-target-pos
+        **g-cutoff** g-cutoff)
   ;; MORE SETUP (ADAPTED FROM FILE-SEARCH-ENGINE-SETUP)
   ;; Check Puzzle is initialized (shared globals all ok)
   (unless
