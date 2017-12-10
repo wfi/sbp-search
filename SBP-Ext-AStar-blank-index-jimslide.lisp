@@ -111,7 +111,6 @@
 
 (defparameter **start-domain-pos-list** nil)      ;; for locally storing uncompressed start-positios-list
 
-;; DON'T USE -- changed GENERATE-SUCCESSORS to save solution internally
 (defparameter **compressed-solution-position**  ;; COMPRESSED SOLUTION POSITION 
   nil)  ;;  (should be set by (GENERATE-SUCCESSORS <position>) when (SOLVED? <some-successor>)
 
