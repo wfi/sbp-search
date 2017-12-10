@@ -239,8 +239,8 @@ fmin ← min{i + j > fmin | Open(i, j) != ∅} ∪ {∞}
            (setf  **solution** (list sol-pos? (1+ g-min) h-max))      ;; h-max is h-index of parent
            (format t "~%FOUND SOLUTION WITH G-VAL = ~a" (1+ g-min))
            (format t "~%   SOLUTION:  ~a" **solution**)
-           (push **solution** **continuous-search-solutions**)
            (when **keep-searching?**
+             (push **solution** **continuous-search-solutions**)
              (setf **solution** nil)
              (setf **g-cutoff** g-min)  ;; cutoff is 1 less than best solution found
              (format t "~% Setting **g-cutoff** to ~a" **g-cutoff**)))
