@@ -415,64 +415,71 @@
 
 ;;; For Ext-AStar-SBP, output-buffer = (h-max A0 A1 A2) where Ai are hash-tables
 ;;;    h-value computed from **intermediate-position** and used to select Ai for storing position
-(defun generate-successors (position output-buffer &optional (check-solved? **check-solved?**))
+(defun generate-successors (position output-buffer
+                            &optional h-cutoff? (check-solved? **check-solved?**))
   ;; position is expected to be a byte-position in register:  **sbp-position-register**
   ;; OOPS - its not in that register!  [it's actually a front-position of an input buffer - better not modify it!]
   (setf **compressed-solution-position** nil) ;; reset for case of continuous search
   ;; uncompress position
   (jimslide-uncompress position) ;; target is **intermediate-position** and **intermediate-blank-index**
-  (loop ; with source-blank-index = (extract-index-from-byte-seq position) ; now **intermediate-blank-index**
-     with (h-max A0 A1 A2) =  output-buffer
-     for (piece-type . piece-type-specs) in (aref **move-specs-for-blank-pattern** **intermediate-blank-index**)
-     do
-       (loop for (moved-from . moved-to-index-pairs) in piece-type-specs
-          when ; (logbitp moved-from piece-type-bits)   ;; there is a piece there, so is legal move!
-            (= (aref **intermediate-position** moved-from) ;; type of piece at position moved-from
-               piece-type) ;; must match piece-type from move-spec
-          do
-            (setf (aref **intermediate-position** moved-from) -1) ;; remove moving piece
-            (loop for (moved-to . new-blanks-index) in moved-to-index-pairs
-	       do
-	       ;; make-move
-                 (setf (aref **intermediate-position** moved-to) piece-type)
-	       ;; compress with NEW BLANK-INDEX
-                 (jimslide-compress new-blanks-index) ;; compresses to **sbp-position-register**
-               ;;     using new-banks-index
-	       ;; check if solved
-                 (when (and check-solved?
-                            (solved?)) ;; checks **intermediate-position**
-                   (setf **compressed-solution-position**
-                         (copy-seq **sbp-position-register**)))
-	       ;; write successor to output buffer
-	       ;; (print "SUCCESSOR:")
-	       ;; (fancy-display-compressed-position **sbp-position-register**)
-               ;; (write-position output-buffer **sbp-position-register**)
-                 (let ((succ-h (if **target-position**
-                                   (* **h-scale**
-                                      (fast-manhattan-move-h-fun))
-                                   (* **h-scale**
-                                      (t-piece-h-fun new-blanks-index
-                                                     **intermediate-position**))))
-                       (succ-pos **sbp-position-register**)) ;; don't need to copy with write-to-file
-                   (let ((x (- succ-h h-max)))
-                     (cond ((> x 0) (write-position A2 succ-pos))
-                           ((= x 0) (write-position A1 succ-pos))
-                           ((< x 0) (write-position A0 succ-pos))))
+  ;; don't expand unless position satisfies h-cutoff?
+  (when (or (null h-cutoff?)            ;; no h-cutoff?
+            (<= (if **target-position** ;; or base-h-fun value <= h-cutoff?
+                    (fast-manhattan-move-h-fun)
+                    (t-piece-h-fun))
+                h-cutoff?))
+    (loop ; with source-blank-index = (extract-index-from-byte-seq position) ; now **intermediate-blank-index**
+       with (h-max A0 A1 A2) =  output-buffer
+       for (piece-type . piece-type-specs) in (aref **move-specs-for-blank-pattern** **intermediate-blank-index**)
+       do
+         (loop for (moved-from . moved-to-index-pairs) in piece-type-specs
+            when ; (logbitp moved-from piece-type-bits)   ;; there is a piece there, so is legal move!
+              (= (aref **intermediate-position** moved-from) ;; type of piece at position moved-from
+                 piece-type) ;; must match piece-type from move-spec
+            do
+              (setf (aref **intermediate-position** moved-from) -1) ;; remove moving piece
+              (loop for (moved-to . new-blanks-index) in moved-to-index-pairs
+                 do
+                 ;; make-move
+                   (setf (aref **intermediate-position** moved-to) piece-type)
+                 ;; compress with NEW BLANK-INDEX
+                   (jimslide-compress    ;; compresses to **sbp-position-register** 
+                    new-blanks-index)    ;;    using new-banks-index
+                 ;; check if solved
+                   (when (and check-solved?
+                              (solved?)) ;; checks **intermediate-position**
+                     (setf **compressed-solution-position**
+                           (copy-seq **sbp-position-register**)))
+                 ;; write successor to output buffer
+                 ;; (print "SUCCESSOR:")
+                 ;; (fancy-display-compressed-position **sbp-position-register**)
+                 ;; (write-position output-buffer **sbp-position-register**)
+                   (let* ((succ-base-h (if **target-position**
+                                           (fast-manhattan-move-h-fun)
+                                           (t-piece-h-fun new-blanks-index
+                                                          **intermediate-position**)))
+                          (succ-h (* succ-base-h **h-scale**))
+                          (succ-pos **sbp-position-register**)) ;; don't need to copy with write-to-file
+                     (when (or (null h-cutoff?)
+                               (< succ-base-h h-cutoff?))   ;; inequality since succ is already g+1
+                       (let ((x (- succ-h h-max)))
+                         (cond ((> x 0) (write-position A2 succ-pos))
+                               ((= x 0) (write-position A1 succ-pos))
+                               ((< x 0) (write-position A0 succ-pos))))
+                       (inc-counter 'all-successors)))
+                   (when **debug**
+                     (format t "~% called (inc-counter 'all-successors) new count = ~a"
+                             (get-counter 'all-successors)))
+                 ;; undo-move-to -- remove moved-to entry
+                   (setf (aref **intermediate-position** moved-to) -1)
                    )
-                 (inc-counter 'all-successors)
-                 (when **debug**
-                   (format t "~% called (inc-counter 'all-successors) new count = ~a"
-                           (get-counter 'all-successors)))
-	       ;; undo-move-to -- remove moved-to entry
-                 (setf (aref **intermediate-position** moved-to) -1)
-                 )
-            (setf (aref **intermediate-position** moved-from) piece-type) ;; reset moving piece
-            )
-       )
+              (setf (aref **intermediate-position** moved-from) piece-type) ;; reset moving piece
+              )
+         ))
   ;; return solution if 1 has been found
   (cond (**compressed-solution-position**
-         **compressed-solution-position**)  ;; return compressed solution, if one found (already copied above when set)
-        (t nil)))                         ;; otherwise NIL
+         **compressed-solution-position**) ;; return compressed solution, if one found (already copied above when set)
+        (t nil)))                          ;; otherwise NIL
 
 
 ;; This returns a list of successors of position

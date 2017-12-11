@@ -158,7 +158,9 @@ fmin ← min{i + j > fmin | Open(i, j) != ∅} ∪ {∞}
        (format t "~% f-min = ~a" f-min)
        (loop 
           while (and (<= g-min f-min)
-                     (not **solution**))
+                     (not **solution**)
+                     (or (not **g-cutoff**)
+                         (< g-min **g-cutoff**)))
           do
           ;; hmax ← fmin − gmin
             (setf h-max (- f-min g-min))
@@ -221,11 +223,13 @@ fmin ← min{i + j > fmin | Open(i, j) != ∅} ∪ {∞}
       (princ output-object))
     (loop with sol-pos? = nil
        with in-buff = (get-bucket-in g-min h-max)
+       with h-cutoff? = (when **g-cutoff**
+                          (- **g-cutoff** g-min))
        for pos = (when in-buff (get-front-position in-buff)) then (next-position in-buff)
        while (and pos
                   (not **solution**)
                   (or (not **g-cutoff**)
-                      (<= g-min **g-cutoff**))
+                      (< g-min **g-cutoff**))   ;; inequality, else would exceed cutoff
                   )
        do
          (inc-counter 'expanded-positions)
@@ -233,7 +237,7 @@ fmin ← min{i + j > fmin | Open(i, j) != ∅} ∪ {∞}
          (when **debug**
            (print 'generating-successors-of-pos)
            (princ pos))
-         (setf sol-pos? (generate-successors pos output-object))
+         (setf sol-pos? (generate-successors pos output-object h-cutoff?))
                                         ;(print 'after-calling-generate-successors)
          (when sol-pos?
            (setf  **solution** (list sol-pos? (1+ g-min) h-max))      ;; h-max is h-index of parent
@@ -243,7 +247,8 @@ fmin ← min{i + j > fmin | Open(i, j) != ∅} ∪ {∞}
              (push **solution** **continuous-search-solutions**)
              (setf **solution** nil)
              (setf **g-cutoff** g-min)  ;; cutoff is 1 less than best solution found
-             (format t "~% Setting **g-cutoff** to ~a" **g-cutoff**)))
+             (format t "~% Setting **g-cutoff** to ~a" **g-cutoff**)
+             (setf h-cutoff? (- **g-cutoff** g-min))))
 
        finally
          (when in-buff
