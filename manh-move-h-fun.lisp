@@ -440,6 +440,9 @@ Type-num     Piece-descrip.   Multiplicity   Hor.   Vert    Hor,vert
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 ;; CLIMB24 Solution Targets
+(defparameter **climb24-target-227**            ;; 227 sol-pos from h-scale=8 (cutoff 230)
+  #(19171737 2003195206 680932688 341054))
+
 (defparameter **climb24-target-230**            ;; 230 sol-pos from hscale = 4
   #(110270073 1116033380 1989367168 341054))
 
