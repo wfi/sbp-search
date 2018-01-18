@@ -172,6 +172,9 @@
 (defparameter **t-piece-hfun-component** nil)
 (defparameter **blanks-mask-lists** nil)
 
+;;; TEMP FOR DATA COLLECTION
+(defparameter **piece-type-move-counts** nil)
+
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; DefVar's from old sliding-block puzzle solver code (near end of file)
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -438,6 +441,9 @@
                  piece-type) ;; must match piece-type from move-spec
             do
               (setf (aref **intermediate-position** moved-from) -1) ;; remove moving piece
+            ;; update piece-type-move-counts
+              (incf (aref **piece-type-move-counts** piece-type)
+                    (length moved-to-index-pairs))
               (loop for (moved-to . new-blanks-index) in moved-to-index-pairs
                  do
                  ;; make-move

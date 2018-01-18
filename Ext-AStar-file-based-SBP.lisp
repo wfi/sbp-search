@@ -71,6 +71,8 @@ fmin ← min{i + j > fmin | Open(i, j) != ∅} ∪ {∞}
 
 (defparameter **equality-test** nil)  ;; needed to compile -- gets set in SBP-SETUP-EXT-ASTAR
 
+;;; for data collection
+(defparameter **piece-type-move-counts** nil)
 
 ;; for hash-tables
 #|
@@ -102,6 +104,9 @@ fmin ← min{i + j > fmin | Open(i, j) != ∅} ∪ {∞}
   (setf **max-g** g-bound)
   (setf **max-h** h-bound)
   (setf **successors-fun** successors-fun)
+  ;; for collecting data on piece-type-moves
+  (setf **piece-type-move-counts**
+        (make-array *num-piece-types* :initial-element 0))
   ;; print parameter info
   (print-parameter-info '(**init-position**
                           **max-g**
@@ -122,6 +127,7 @@ fmin ← min{i + j > fmin | Open(i, j) != ∅} ∪ {∞}
                           **target-position**    ;; used to select h-fun type
                           **g-cutoff**
                           **keep-searching?**
+                          **piece-type-move-counts**
                           ))
   ;; if **target-position** display the position in ascii art
   (when **target-position**
@@ -166,6 +172,8 @@ fmin ← min{i + j > fmin | Open(i, j) != ∅} ∪ {∞}
             (setf h-max (- f-min g-min))
             (format t "~% h-max = ~a" h-max)
             (report-all-timers)
+            (format t "~% Piece-type-move-counts:~%   ~a"
+                    **piece-type-move-counts**)
           ;; A(fmin), A(fmin + 1), A(fmin + 2) ← N(Open(gmin, hmax))
           ;; A0, A1, A2
           ;;(g h write-segments? out-buff-to-repoint)
@@ -202,6 +210,8 @@ fmin ← min{i + j > fmin | Open(i, j) != ∅} ∪ {∞}
        (format t "~% End Pass Through Outer Loop, New F-MIN = ~a" f-min)
      finally
        (report-all-timers)
+       (format t "~% Piece-type-move-counts:~%   ~a"
+               **piece-type-move-counts**)
        (return **solution**)
        ))
 
