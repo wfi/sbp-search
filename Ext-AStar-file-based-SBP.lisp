@@ -73,6 +73,11 @@ fmin ← min{i + j > fmin | Open(i, j) != ∅} ∪ {∞}
 
 ;;; for data collection
 (defparameter **piece-type-move-counts** nil)
+(defparameter **gil-hash-length** nil)
+(defparameter **gil-hash-parent** nil)
+(defparameter **gil-hash-child** nil)
+(defparameter **gil-hash-ignore-types** nil)
+
 
 ;; for hash-tables
 #|
@@ -104,9 +109,8 @@ fmin ← min{i + j > fmin | Open(i, j) != ∅} ∪ {∞}
   (setf **max-g** g-bound)
   (setf **max-h** h-bound)
   (setf **successors-fun** successors-fun)
-  ;; for collecting data on piece-type-moves
-  (setf **piece-type-move-counts**
-        (make-array *num-piece-types* :initial-element 0))
+  ;; for collecting data on piece-type-moves and gil-hash locality
+  (initialize-data-collection **puzzle-name**) ;; defined in SBP-Ext-AStar-blank-index-jimslide
   ;; print parameter info
   (print-parameter-info '(**init-position**
                           **max-g**
@@ -128,6 +132,10 @@ fmin ← min{i + j > fmin | Open(i, j) != ∅} ∪ {∞}
                           **g-cutoff**
                           **keep-searching?**
                           **piece-type-move-counts**
+                          **gil-hash-length**
+                          **gil-hash-parent**
+                          **gil-hash-child**
+                          **gil-hash-ignore-types**
                           ))
   ;; if **target-position** display the position in ascii art
   (when **target-position**
@@ -174,6 +182,7 @@ fmin ← min{i + j > fmin | Open(i, j) != ∅} ∪ {∞}
             (report-all-timers)
             (format t "~% Piece-type-move-counts:~%   ~a"
                     **piece-type-move-counts**)
+            (report-gil-hash-counts)
           ;; A(fmin), A(fmin + 1), A(fmin + 2) ← N(Open(gmin, hmax))
           ;; A0, A1, A2
           ;;(g h write-segments? out-buff-to-repoint)

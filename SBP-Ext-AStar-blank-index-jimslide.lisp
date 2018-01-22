@@ -174,6 +174,11 @@
 
 ;;; TEMP FOR DATA COLLECTION
 (defparameter **piece-type-move-counts** nil)
+(defparameter **gil-hash-parent** nil)
+(defparameter **gil-hash-child** nil)
+(defparameter **gil-hash-ignore-types** nil)
+(defparameter **same-gil-hash** 0)
+(defparameter **diff-gil-hash** 0)
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; DefVar's from old sliding-block puzzle solver code (near end of file)
@@ -431,6 +436,8 @@
                     (fast-manhattan-move-h-fun)
                     (t-piece-h-fun))
                 h-cutoff?))
+    ;; compute Gil-Hash
+    (record-gil-hash **gil-hash-parent**)
     (loop ; with source-blank-index = (extract-index-from-byte-seq position) ; now **intermediate-blank-index**
        with (h-max A0 A1 A2) =  output-buffer
        for (piece-type . piece-type-specs) in (aref **move-specs-for-blank-pattern** **intermediate-blank-index**)
@@ -468,6 +475,14 @@
                           (succ-pos **sbp-position-register**)) ;; don't need to copy with write-to-file
                      (when (or (null h-cutoff?)
                                (< succ-base-h h-cutoff?))   ;; inequality since succ is already g+1
+                       ;; valid successor
+                       ;;  update gil-hash stats
+                       (record-gil-hash **gil-hash-child**)
+                       (if (equalp **gil-hash-child**
+                                   **gil-hash-parent**)
+                           (incf **same-gil-hash**)
+                           (incf **diff-gil-hash**))
+                       ;; write to appropriate output-buffer
                        (let ((x (- succ-h h-max)))
                          (cond ((> x 0) (write-position A2 succ-pos))
                                ((= x 0) (write-position A1 succ-pos))
@@ -528,18 +543,85 @@
        )
   )
 
+;;; DATA COLLECTION [piece-type moves and Gil-Hash data]
+
+(defun initialize-data-collection (puzzle-name-string)
+  (let ((puzzle-name (read-from-string puzzle-name-string)))
+    (print puzzle-name)
+    (setf **same-gil-hash** 0
+          **diff-gil-hash** 0)
+    (setf **piece-type-move-counts**
+          (make-array *num-piece-types* :initial-element 0))
+    (setf **gil-hash-ignore-types**
+          (case puzzle-name
+            (climb24 '(-1 ;; empty-value of intermediate position
+                       6  ;; 2x1
+                       7  ;; 1x2
+                       9  ;; 1x1
+                       ;; blanks not specified so no need to omit
+                       ))
+            (climb15a '(-1 ;; empty-value of intermediate position
+                        5  ;; 2x1
+                        6  ;; 1x2
+                        8  ;; 1x1
+                        ;; blanks not specified so no need to omit
+                        ))
+            (climb12 '(-1 ;; empty-value of intermediate position
+                       2  ;; 2x1
+                       3  ;; 1x2
+                       5  ;; 1x1
+                       ;; blanks not specified so no need to omit
+                       ))
+            (t (warn "Unrcognized Puzzle Name"))
+            ))
+    (setf **gil-hash-length**
+          (compute-gil-hash-length))
+    (setf **gil-hash-parent**
+          (make-array **gil-hash-length**
+                      :element-type '(signed-byte 8)
+                      :fill-pointer t))
+    (setf **gil-hash-child**
+          (make-array **gil-hash-length**
+                      :element-type '(signed-byte 8)
+                      :fill-pointer t))
+    ))
+
+(defun compute-gil-hash-length ()
+  (jimslide-uncompress **init-position**)
+  (loop for val across **intermediate-position**
+     count (not (member val **gil-hash-ignore-types**))
+       ))
+
+(defun record-gil-hash (target)   ;; target is **gil-hash-parent** or **gil-hash-child** 
+  ;; operates on sequence in  **intermediate-position**
+  (setf (fill-pointer target)
+        0)
+  (loop for val across **intermediate-position**
+     unless (member val **gil-hash-ignore-types**)
+     do
+       (vector-push val target)))
+        
+(defun report-gil-hash-counts ()
+  (format t "~%  Gil-Hash locality:  ~f~%    Same: ~a~%    Diff: ~a"
+          (unless (zerop (+ **same-gil-hash**
+                            **diff-gil-hash**))
+            (float (/ **same-gil-hash**
+                      (+ **same-gil-hash**
+                         **diff-gil-hash**))))
+          **same-gil-hash**
+          **diff-gil-hash**))
 
 ;;; T-PIECE H-FUN
 (defun t-piece-h-fun (&optional
-                      (new-blanks-index **intermediate-blank-index**)
-                      (intermediate-pos **intermediate-position**)
-                      (t-piece-type **t-piece-type**))
+                        (new-blanks-index **intermediate-blank-index**)
+                        (intermediate-pos **intermediate-position**)
+                        (t-piece-type **t-piece-type**))
   (loop for cell-index from 0
-        for type-val across intermediate-pos
-        until (= type-val t-piece-type)
-        finally
+     for type-val across intermediate-pos
+     until (= type-val t-piece-type)
+     finally
                                         ;(print (list type-val cell-index))
-        (return 
+       (return 
          (+ (aref **t-piece-hfun-component** cell-index)
             (t-piece-hfun-blanks-offset cell-index
                                         (aref **cells-bitint-from-blank-index**
