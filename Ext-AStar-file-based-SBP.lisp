@@ -72,6 +72,7 @@ fmin ← min{i + j > fmin | Open(i, j) != ∅} ∪ {∞}
 (defparameter **equality-test** nil)  ;; needed to compile -- gets set in SBP-SETUP-EXT-ASTAR
 
 ;;; for data collection
+(defparameter **collect-type-and-gil-hash-data?** nil)
 (defparameter **piece-type-move-counts** nil)
 (defparameter **gil-hash-length** nil)
 (defparameter **gil-hash-parent** nil)
@@ -102,6 +103,7 @@ fmin ← min{i + j > fmin | Open(i, j) != ∅} ∪ {∞}
                           (h-bound **max-h**)
                           (h-fun **h-fun**)
                           (successors-fun **successors-fun**)
+                          (collect-data? **collect-type-and-gil-hash-data?**)
                           )
   (init-out-buffs) ;; sets up 3 out-buffs (**out-buff-0** **out-buff-1** **out-buff-2**)
   (setf **solution** nil)
@@ -110,7 +112,8 @@ fmin ← min{i + j > fmin | Open(i, j) != ∅} ∪ {∞}
   (setf **max-h** h-bound)
   (setf **successors-fun** successors-fun)
   ;; for collecting data on piece-type-moves and gil-hash locality
-  (initialize-data-collection **puzzle-name**) ;; defined in SBP-Ext-AStar-blank-index-jimslide
+  (initialize-data-collection **puzzle-name** ;; defined in SBP-Ext-AStar-blank-index-jimslide
+                              collect-data?)
   ;; print parameter info
   (print-parameter-info '(**init-position**
                           **max-g**
@@ -131,6 +134,7 @@ fmin ← min{i + j > fmin | Open(i, j) != ∅} ∪ {∞}
                           **target-position**    ;; used to select h-fun type
                           **g-cutoff**
                           **keep-searching?**
+                          **collect-type-and-gil-hash-data?**
                           **piece-type-move-counts**
                           **gil-hash-length**
                           **gil-hash-parent**
@@ -180,9 +184,10 @@ fmin ← min{i + j > fmin | Open(i, j) != ∅} ∪ {∞}
             (setf h-max (- f-min g-min))
             (format t "~% h-max = ~a" h-max)
             (report-all-timers)
-            (format t "~% Piece-type-move-counts:~%   ~a"
-                    **piece-type-move-counts**)
-            (report-gil-hash-counts)
+            (when **collect-type-and-gil-hash-data?**
+              (format t "~% Piece-type-move-counts:~%   ~a"
+                      **piece-type-move-counts**)
+              (report-gil-hash-counts))
           ;; A(fmin), A(fmin + 1), A(fmin + 2) ← N(Open(gmin, hmax))
           ;; A0, A1, A2
           ;;(g h write-segments? out-buff-to-repoint)
@@ -219,8 +224,9 @@ fmin ← min{i + j > fmin | Open(i, j) != ∅} ∪ {∞}
        (format t "~% End Pass Through Outer Loop, New F-MIN = ~a" f-min)
      finally
        (report-all-timers)
-       (format t "~% Piece-type-move-counts:~%   ~a"
-               **piece-type-move-counts**)
+       (when **collect-type-and-gil-hash-data?**
+         (format t "~% Piece-type-move-counts:~%   ~a"
+                 **piece-type-move-counts**))
        (return **solution**)
        ))
 

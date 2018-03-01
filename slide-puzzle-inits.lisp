@@ -2074,6 +2074,75 @@
     ))
 
 
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;; Mini Climb Pro  [requires 561 moves according to Ext-A* search]
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;
+;; cf Henderson e-mail to Nobnet (27 July 2005)
+
+;;         _
+;; 0   ___| |___
+;; 1  |_|x|___|x|
+;; 2  |___|x|   |
+;; 3  |_|_  |___|
+;; 4  |_| |_|_| |
+;; 5  |_|_|_| |_|
+;; 6  |___|_____|
+;;
+
+#|
+# # # # # # #
+# # # 3 # # #
+# 8   3 3   #
+# 4 4   1 1 #
+# 9 2 2 1 1 #
+# A 6 2 B 7 #
+# C 6 D 0 7 #
+# 5 5 0 0 0 #
+# # # # # # #
+|#
+
+(defun mini-climb-pro-init ()
+  (slide-init (mini-climb-pro-template)
+              (mini-climb-pro-piece-types)
+              (mini-climb-pro-start-list))
+  (set-mini-climb-pro-target))
+
+(defun mini-climb-pro-template ()
+  (obstacle-template 7 5 '((0 0)(0 1)(0 3)(0 4))))
+
+(defun set-mini-climb-pro-target ()
+  (single-target-from-row-col 5 0 2))         ;; T piece now type 5
+
+;;  NOTE: pieces re-ordered (with re-numbered types) version 25 -- not compatible with previous position representations
+(defun mini-climb-pro-piece-types ()
+  '(((0 0)(0 1)(1 0)(1 1))              ; 0  2x2 square
+
+    ((0 0)(0 1)(1 1))                   ; 1  Upper Right pointing L
+
+    ((0 0)(1 0)(1 1))                   ; 2  Lower Left pointing L
+    ((0 0)(1 0))                        ; 3  2x1 vertical rectangle
+    ((0 0)(0 1))                        ; 4  1x2 horizontal rectangle
+    ((0 0)(1 -1)(1 0)(1 1))             ; 5  4 cell T (stem up)
+    ((0 0))))                           ; 6  1x1 unit square
+
+(defun mini-climb-pro-start-list ()
+  '((0 2 3)
+    (1 3 1)   ;; NE
+    (2 0 2)   ;; SW
+    (3 4 1)   ;; 2x1
+    (3 4 4)
+    (4 2 0)   ;; 1x2
+    (4 6 0)
+    (5 5 3)   ;; T
+    (6 1 0)   ;; 1x1
+    (6 3 0)
+    (6 4 0)
+    (6 4 3)
+    (6 5 0)
+    (6 5 2)
+    ))
+
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; Hole in One
