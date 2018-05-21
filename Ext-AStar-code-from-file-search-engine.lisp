@@ -112,9 +112,14 @@
   (make-array 8200 :initial-element nil))    ;; ran out with 1000 on level 117 of BoxedIn 1-46
 					     ;;  Climb15a exhausted 2000 with buff=50000 pos's
 
-(defparameter **prior-fan?** T)     ;; controls which prior buckets used in duplicate elimination
-                                    ;;  NIL is old behavior as for admissible (just check g-1 & g-2)
-                                    ;;  T "fans out" to check 8 prior buckets
+(defparameter **prior-fan?** nil)     ; controls setting offsets for collect-prior-buckets
+                                        ;used in duplicate elimination
+                                        ; Values:
+                                        ;   Normal (default) (just check g-1 & g-2)
+                                        ;   Fan-six  (6-bucket triangular fanout)
+                                        ;   Fan-six-plus  (fan-six with bucket below present)
+                                        ;   Custom  (compute custom offsets from parameters)
+(defparameter **prior-fan-offsets** nil)
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; DOMAIN INTERFACE
@@ -634,12 +639,20 @@ ratio))
       (store-open-info bucket-g bucket-h :segment-count segment-count))
     (close output-buffer-file-stream)))
 
-    
+
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; MERGING SEGMENTS
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
+(defun get-prior-bucket-offsets (fan-type)
+  (case fan-type
+    (normal '((-1 0)(-2 0)))  ;; 2 prior g-buckets at same h-level
+    (fan-six '((-1 0)(-1 1)(-1 -1)(-2 0)(-2 1)(-2 2)(-2 -1)(-2 -2)))
+    ;; next adds  bucket below "current bucket" (same g, but h-1)
+    (fan-six-plus '((0 -1)(-1 0)(-1 1)(-1 -1)(-2 0)(-2 1)(-2 2)(-2 -1)(-2 -2)))
+    (custom (custom-prior-bucket-offsets))  ;; compute offsets
+    (t '((-1 0)(-2 0)))))  ;; default to normal (2 prior g-buckets at same h-level)
 
 ;;; this decides which version (heap or not) should be used based on **heap-threshold**
 ;;;   Now records data and deletes segments
@@ -725,8 +738,8 @@ ratio))
        )))
 
 (defun merge-segments-no-heap (g h
-		       &optional
-		       (segment-filepaths-passed-in nil))
+                               &optional
+                                 (segment-filepaths-passed-in nil))
   (format t "~%Merging ~a segments" (length segment-filepaths-passed-in))
   ;; collect-segment filenames
   (let* ((debug? nil)
@@ -739,7 +752,7 @@ ratio))
 		 collect segment-path)))
          (previous-bucket-filepaths
 	  (collect-prior-buckets g h)
-	  ))
+           ))
     (when debug? (print segment-filepaths))
     (loop with segment-input-buffers = (allocate-or-reuse-input-buffers segment-filepaths 0)
        with prior-bucket-input-buffers = (allocate-or-reuse-input-buffers 
@@ -751,26 +764,27 @@ ratio))
        for candidate-pos = (minimize-front-position segment-input-buffers) ;; NIL if all buffers empty
        while candidate-pos ;; candidate-pos only NIL if all buffers empty, so DONE!
        do
-       (when debug?
-	 (print candidate-pos))
+         (when debug?
+           (print candidate-pos))
        ;; advance all prior-buckets past candidate-pos, T if equal found
-       (unless (advance-all-in-buffers-check-equality? prior-bucket-input-buffers 
-						       candidate-pos)
-	 ;; only write if there was no duplicate in a prior-bucket
+         (unless (advance-all-in-buffers-check-equality? prior-bucket-input-buffers 
+                                                         candidate-pos)
+           ;; only write if there was no duplicate in a prior-bucket
 					;(format t "writing out position ~a in merge-segments" candidate-pos)
-	 (write-position output-buffer candidate-pos))
+           (write-position output-buffer candidate-pos))
        ;; advance all segment-buffers past candidate-pos  [Note: prior-buckets already advanced ]
-       (advance-all-in-buffers segment-input-buffers candidate-pos)
+         (advance-all-in-buffers segment-input-buffers candidate-pos)
        finally
-       (loop for inbuff in segment-input-buffers
-	  do
-	  (close-buffer inbuff))
-       (loop for inbuff in prior-bucket-input-buffers
-	  do
-	  (close-buffer inbuff))
-       (close-buffer output-buffer)
-       )))
+         (loop for inbuff in segment-input-buffers
+            do
+              (close-buffer inbuff))
+         (loop for inbuff in prior-bucket-input-buffers
+            do
+              (close-buffer inbuff))
+         (close-buffer output-buffer)
+         )))
 
+#|
 (defun collect-prior-buckets-admissible (g h)
   (loop with least-depth-prior-fringe = (- g 2)  ;; look at previous 2 buckets with same h
      for prior-g from (1- g) downto least-depth-prior-fringe
@@ -778,30 +792,47 @@ ratio))
      when (probe-file prior-bucket-path)   ;; changed while to when (should work the same)
      collect prior-bucket-path)
   )
+|#
 
-(defun collect-prior-buckets (g h &optional (prior-fan? **prior-fan?**))
-  (loop with g-h-delta-list = (if prior-fan?
-				  '((-1 -1)(-1 0)(-1 1)(-2 -2)(-2 -1)(-2 0)(-2 1)(-2 2))
-				  '((-1 0) (-2 0)))
+(defun collect-prior-buckets (g h &optional
+                                    (prior-fan-offsets **prior-fan-offsets**)
+                                    )
+  (loop with g-h-delta-list = prior-fan-offsets
      for (delta-g delta-h) in g-h-delta-list
      for prior-bucket-path = (bucket-pathname (+ g delta-g) (+ h delta-h))
      when (probe-file prior-bucket-path)   ;; changed while to when (should work the same)
      collect prior-bucket-path)
   )
 
+;; hypothesis: dups can only appear up to h-scale distance from "true" h-scale
+;;     NOT TRUE
+;; brute force: try ALL offsets to h-spread = **max-h**
+(defun custom-prior-bucket-offsets (&optional (h-spread **h-scale**))
+  (append
+   (same-gen-prior-offsets 0 -1 h-spread)  ;; check lower h-vals at current g-val
+   (same-gen-prior-offsets -1 h-spread (1+ (* 2 h-spread)))
+   (same-gen-prior-offsets -2 (* 2 h-spread) (1+ (* 4 h-spread)))))
+
+
+(defun same-gen-prior-offsets (g-offset h-start spread-count)
+  (loop repeat spread-count
+     for h-offset downfrom h-start
+     collect
+       (list g-offset h-offset)))
+
 (defun allocate-or-reuse-input-buffers (list-of-input-filepaths &optional (start-inbuff-index 0))
   (loop for buff-index from start-inbuff-index
-       for filepath in list-of-input-filepaths
-       for inbuff = (aref **free-input-buffers** buff-index)
-       do
+     for filepath in list-of-input-filepaths
+     for inbuff = (aref **free-input-buffers** buff-index)
+     do
        (cond (inbuff
 	      (reuse-input-buffer inbuff filepath))
 	     (t   ;;need to allocate new inbuff
 	      (setf inbuff (new-input-buffer filepath))    ;; allocate new inbuff
 	      (setf (aref **free-input-buffers** buff-index)  ;; store it in free inbuffs
 		    inbuff)))
-       collect
-       inbuff))
+     collect
+     inbuff))
 
           
 (defun advance-all-in-buffers (in-buffer-list candidate)

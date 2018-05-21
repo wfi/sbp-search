@@ -1446,6 +1446,59 @@
 |#
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;; CLIMB PUZZLE PIECE-TYPE DELTAS (assuming 4 blanks)
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+;;; utility functions
+(defun vertical-range (row1 row2 col)   ;; row1 <= row2
+  (loop for row from row1 to row2
+     collect
+       (list row col)))
+
+(defun horizontal-range (row col1 col2)   ;; col1 <= col2
+  (loop for col from col1 to col2
+     collect
+       (list row col)))
+
+(defun diamond-pairs (n)
+  (loop for row from (- n) to n
+     append
+       (loop for col from (- n) to n
+          unless (> (+ (abs row) (abs col))
+                    n)
+          collect (list row col))))
+
+(defun t-piece-deltas ()
+  (append (horizontal-range 0 -2 2)
+          (horizontal-range -1 -1 1)
+          (horizontal-range 1 -1 1)))
+
+(defun square-2x2-detas ()    ;; same for 2x2  NE NW SE and SW
+  (diamond-pairs 2))
+
+(defun vertical-2x1-deltas ()
+  (append (vertical-range -4 4 0)
+          (vertical-range -2 2 -1)
+          (vertical-range -2 2 1)
+          '((0 -2)(0 2))))
+
+(defun horizontal-1x2-deltas ()
+  (append (horizontal-range 0 -4 4)
+          (horizontal-range -1 -2 2)
+          (horizontal-range 1 -2 2)
+          '((-2 0)(2 0)))
+  )
+
+(defun horizontal-1x3-deltas ()
+  (append (horizontal-range 0 -4 4)
+          (horizontal-range -1 -1 1)
+          (horizontal-range 1 -1 1)))
+
+(defun singleton-1x1-deltas ()
+  (diamond-pairs 4))
+
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; climb-12
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
@@ -1476,11 +1529,28 @@
     ((0 0)(1 -1)(1 0)(1 1))             ; 4  4 square T (stem up)
     ((0 0))))                           ; 5  1x1 unit square
 
+(defun climb12-piece-type-deltas ()
+  (list (t-piece-deltas)        ;; T
+        (square-2x2-detas)      ;; NW
+        (square-2x2-detas)      ;; SE
+        (vertical-2x1-deltas)   ;; 2x1 vertical rect
+        (horizontal-1x2-deltas) ;; 1x2 horizontal rect
+        (singleton-1x1-deltas)  ;; 1x1 singleton
+        ))
+
 (defun climb12-init ()
   (slide-init (climb12-template)
               (climb12-piece-types)
               (climb12-start-list))
   (set-climb12-target))
+
+(defun climb12-init-reduced (typenums-to-omit)
+  (slide-init-reduced (climb12-template)
+                      (climb12-piece-types)
+                      (climb12-start-list)
+                      typenums-to-omit
+                      '(0 0 2)  ;; target form  (type row col)
+                      (climb12-piece-type-deltas)))
 
 (defun climb12-start-list ()
   '((0 2 1)
@@ -1801,6 +1871,20 @@
               (climb15a-start-list))
   (set-climb15-target))
 
+(defun climb15a-B3-init ()
+  (slide-init (climb15-template)
+              (climb15-piece-types)
+              (climb15a-B3-start-list))
+  (set-climb15-target))
+
+(defun climb15a-init-reduced (typenums-to-omit)
+  (slide-init-reduced (climb15-template)
+                      (climb15-piece-types)
+                      (climb15a-start-list)
+                      typenums-to-omit
+                      '(1 0 2)  ;; target form  (type row col)
+                      (climb15-piece-type-deltas)))
+
 (defun climb15a-start-list ()
   '((0 4 0)
     (1 2 0)
@@ -1812,6 +1896,23 @@
     (6 6 0)
     (6 6 3)
     (7 6 2)   ; T-piece  -- types and starts re-ordered / modified in Version 25
+    (8 1 0)
+    (8 1 4)
+    (8 7 0)
+    (8 7 4)))
+
+(defun climb15a-B3-start-list ()
+  '((0 4 0)
+    (1 6 2)
+    (2 2 0)
+    (3 4 3)
+    (4 2 2)
+    (5 4 2)
+    (6 2 3)
+    (6 2 4)
+    (7 6 0)
+    (7 6 3)
+    (8 0 2)  ;; extra 1x1 replace blank at top (notch)
     (8 1 0)
     (8 1 4)
     (8 7 0)
@@ -2047,6 +2148,34 @@
               (climb24-start-list))
   (set-climb24-target))
 
+;; only 3 blanks
+(defun climb24-b3-init ()
+  (slide-init (climb24-template)
+              (climb24-piece-types)
+              (climb24-b3-start-list))
+  (set-climb24-target))
+
+(defun climb24-init-reduced (typenums-to-omit)
+  (slide-init-reduced (climb24-template)
+                      (climb24-piece-types)
+                      (climb24-start-list)
+                      typenums-to-omit
+                      '(0 0 3)  ;; target form  (type row col)
+                      (climb24-piece-type-deltas)))
+
+(defun climb24-piece-type-deltas ()
+  (list (t-piece-deltas)        ;; T
+        (square-2x2-detas)      ;; NW
+        (square-2x2-detas)      ;; NE
+        (square-2x2-detas)      ;; SE
+        (square-2x2-detas)      ;; SW
+        (square-2x2-detas)      ;; 2x2 square
+        (vertical-2x1-deltas)   ;; 2x1 vertical rect
+        (horizontal-1x2-deltas) ;; 1x2 horizontal rect
+        (horizontal-1x3-deltas) ;; 1x3 horizontal rect
+        (singleton-1x1-deltas)  ;; 1x1 singleton
+        ))
+
 (defun climb24-start-list ()
   '((0 8 3)    ; T piece
     (1 4 5)    ; up-left L
@@ -2073,6 +2202,32 @@
     (9 8 4)    ; 1x1
     ))
 
+(defun climb24-b3-start-list ()
+  '((0 8 3)    ; T piece
+    (1 4 5)    ; up-left L
+    (2 3 3)    ; up-right L
+    (2 4 0)    ; up-right L
+    (3 6 1)    ; down-right L
+    (4 3 2)    ; down-left L
+    (4 6 5)    ; down-left L
+    (5 2 0)    ; 2x2
+    (5 2 5)    ; 2x2
+    (5 8 0)    ; 2x2
+    (5 8 5)    ; 2x2
+    (6 5 0)    ; 2x1 (vertical)
+    (6 5 2)    ; 2x1 (vertical)
+    (6 5 4)    ; 2x1 (vertical)
+    (6 5 6)    ; 2x1 (vertical)
+    (7 1 0)    ; 1x2 (horizontal)
+    (7 1 5)    ; 1x2 (horizontal)
+    (8 2 2)    ; 1x3 (horizontal)
+    (8 7 2)    ; 1x3 (horizontal)
+    (9 5 3)    ; 1x1
+    (9 6 3)    ; 1x1
+    (9 8 2)    ; 1x1
+    (9 8 4)    ; 1x1
+    (9 0 3)    ; 1x1 (replacing top blank)
+    ))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; Mini Climb Pro  [requires 561 moves according to Ext-A* search]
@@ -2457,6 +2612,127 @@
     (5 1 0)
     (5 2 4)))
 
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;; Robert Henderson 7x7 post to NOBNET (April 9, 2018)
+;;;   E-mail / Facebook
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+;; START:
+;;   _____________
+;;  |___|x| |___|_|
+;;  | |___|___|x| |
+;;  |_|___|___|___|
+;;  |___|_|_|   | |
+;;  |  _|   |___|_|
+;;  |_| |___| |_  |
+;;  |___|___|___|_|
+;;
+
+(defun henderson-7x7-start-list ()
+  '((0 3 4)   ;; 2x2
+    (0 4 2)   ;; 2x2
+    (1 4 0)   ;; NW
+    (2 5 5)   ;; NE
+    (3 1 6)   ;; SE
+    (3 5 1)   ;; SE
+    (4 0 3)   ;; SW
+    (4 5 4)   ;; SW
+    (5 1 0)   ;; 2x1
+    (5 3 6)   ;; 2x1
+    (6 0 0)   ;; 1x2
+    (6 0 4)   ;; 1x2
+    (6 1 1)   ;; 1x2
+    (6 2 1)   ;; 1x2
+    (6 2 3)   ;; 1x2
+    (6 3 0)   ;; 1x2
+    (6 6 2)   ;; 1x2
+    (7 0 6)   ;; 1x1
+    (7 3 2)   ;; 1x1
+    (7 3 3)   ;; 1x1
+    ))
+
+;; GOAL:
+;;   _____________
+;;  |_|___| |x|___|
+;;  | |x|___|___| |
+;;  |___|___|___|_|
+;;  | |   |_|_|___|
+;;  |_|___|   |_  |
+;;  |  _| |___| |_|
+;;  |_|___|___|___|
+;;
+
+(defun henderson-7x7-target-list ()
+  '((0 3 1)   ;; 2x2
+    (0 4 3)   ;; 2x2
+    (1 5 0)   ;; NW
+    (2 4 5)   ;; NE
+    (3 0 3)   ;; SE
+    (3 5 2)   ;; SE
+    (4 1 0)   ;; SW
+    (4 5 5)   ;; SW
+    (5 3 0)   ;; 2x1
+    (5 1 6)   ;; 2x1
+    (6 0 1)   ;; 1x2
+    (6 0 5)   ;; 1x2
+    (6 1 4)   ;; 1x2
+    (6 2 2)   ;; 1x2
+    (6 2 4)   ;; 1x2
+    (6 3 5)   ;; 1x2
+    (6 6 3)   ;; 1x2
+    (7 0 0)   ;; 1x1
+    (7 3 3)   ;; 1x1
+    (7 3 4)   ;; 1x1
+    ))
+
+#|
+
+Pieces:
+
+0 2x2
+1 NW
+2 NE
+3 SE
+4 SW
+5 2x1
+6 1x2
+7 1x1
+
+|#
+
+(defun henderson-7x7-init ()
+  (slide-init (henderson-7x7-template)
+              (henderson-7x7-piece-types)
+              (henderson-7x7-start-list))
+  (set-henderson-7x7-target))
+
+(defun henderson-7x7-template ()
+  (make-array '(7 7) :initial-element nil))
+
+(defun henderson-7x7-piece-types ()
+  '(((0 0)(0 1)(1 0)(1 1))              ; 0  2x2 square
+    ((0 0)(0 1)(1 0))                   ; 1  Upper Left pointing L
+    ((0 0)(0 1)(1 1))                   ; 2  Upper Right pointing L
+    ((0 0)(1 -1)(1 0))                  ; 3  Lower Right pointing L
+    ((0 0)(1 0)(1 1))                   ; 4  Lower Left pointing L
+    ((0 0)(1 0))                        ; 5  2x1 vertical rectangle
+    ((0 0)(0 1))                        ; 6  1x2 horizontal rectangle
+    ((0 0))))                           ; 7  1x1 singleton
+
+(defun set-henderson-7x7-target ()
+  (setf *solution-target*
+        (henderson-7x7-exact-target)))
+
+
+(defun henderson-7x7-exact-target ()
+  (let ((compiled-target-pos
+         (compile-list-position
+          (list-position-from-start-positions-list 
+           (henderson-7x7-target-list)))))
+    (loop for piece-type from 0 below *num-piece-types*
+       collect
+         (list piece-type (aref compiled-target-pos piece-type)))))
 
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;

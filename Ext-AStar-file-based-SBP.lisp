@@ -67,6 +67,9 @@ fmin ← min{i + j > fmin | Open(i, j) != ∅} ∪ {∞}
 (defparameter **solved?-fun** nil)
 (defparameter **successors-fun** nil)
 
+(defparameter **prior-fan?** nil)
+(defparameter **prior-fan-offsets** nil)
+
 (defparameter **debug** nil)
 
 (defparameter **equality-test** nil)  ;; needed to compile -- gets set in SBP-SETUP-EXT-ASTAR
@@ -129,6 +132,7 @@ fmin ← min{i + j > fmin | Open(i, j) != ∅} ∪ {∞}
                           **moves-invertible?**
                           **debug**
                           **prior-fan?**
+                          **prior-fan-offsets**
                           **h-scale**
                           **max-buffer-position-count**
                           **target-position**    ;; used to select h-fun type
@@ -618,7 +622,7 @@ fmin ← min{i + j > fmin | Open(i, j) != ∅} ∪ {∞}
                               (max-g 110)
                               (h-scale **h-scale**)
                               (max-h (* h-scale 50)) ; NOTE: **h-scale** has default value
-                              (prior-fan? (> h-scale 1))
+                              (prior-fan? (if (> h-scale 1) 'fan-six 'normal))
                               (h-fun #'sbp-h-fun-from-compressed-pos)
                               h-fun-target-pos
                               g-cutoff    ;; can be integer to prune by max allowed sol-length
@@ -635,6 +639,8 @@ fmin ← min{i + j > fmin | Open(i, j) != ∅} ∪ {∞}
         **equality-test** #'equalp
         **target-position** h-fun-target-pos
         **g-cutoff** g-cutoff)
+  (setf **prior-fan-offsets**
+        (get-prior-bucket-offsets **prior-fan?**))  ;; this now computes the offsets
   ;; MORE SETUP (ADAPTED FROM FILE-SEARCH-ENGINE-SETUP)
   ;; Check Puzzle is initialized (shared globals all ok)
   (unless

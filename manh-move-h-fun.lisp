@@ -214,6 +214,14 @@ Type-num     Piece-descrip.   Multiplicity   Hor.   Vert    Hor,vert
     (9 4 2 2 4 4)     ;; 1x1 Singleton
     ))
 
+(defparameter **puzzle-ii-piece-type-move-data**
+  ;; element-format: (type-num simple-md? hor-comb vert-comb hor-only vert-only
+  '((0 1 nil nil 1 1)         ;; 2x2
+    (1 nil nil nil 1 2)   ;; 2x1 Vert Rect
+    (2 nil nil nil 2 1)       ;; 1x2 Hor Rect
+    (3 2 1 1 2 2)     ;; 1x1 Singleton
+    ))
+
 (defun set-piece-type-move-data-for-puzzle-type (puzzle-name)
   (cond ((string-equal puzzle-name "CLIMB12")
 	 (setf **piece-type-move-data**
@@ -224,6 +232,9 @@ Type-num     Piece-descrip.   Multiplicity   Hor.   Vert    Hor,vert
         ((string-equal puzzle-name "CLIMB24")
          (setf **piece-type-move-data**
                **climb24-piece-type-move-data**))
+        ((string-equal puzzle-name "PUZZLE-II")
+         (setf **piece-type-move-data**
+               **puzzle-ii-piece-type-move-data**))
         (t (error "unknown puzzle-name ~a" puzzle-name))
         ))
 
@@ -250,12 +261,15 @@ Type-num     Piece-descrip.   Multiplicity   Hor.   Vert    Hor,vert
   (second (assoc size **permutation-lists-by-size**)))
 
 (defun setup-permutation-lists ()
-  ;;; does sizes 1 to 4 by default
+  ;;; does sizes 1 to 6 by default
   (setf **permutation-lists-by-size**
 	(list (list 1 (collect-permutations '(0)))
 	      (list 2 (collect-permutations '(0 1)))
 	      (list 3 (collect-permutations '(0 1 2)))
-	      (list 4 (collect-permutations '(0 1 2 3))))))
+	      (list 4 (collect-permutations '(0 1 2 3)))
+              (list 5 (collect-permutations '(0 1 2 3 4)))
+              (list 6 (collect-permutations '(0 1 2 3 4 5)))
+              )))
 
 (defun collect-permutations (lis)
   (cond ((null lis)
@@ -334,6 +348,45 @@ Type-num     Piece-descrip.   Multiplicity   Hor.   Vert    Hor,vert
   (let* ((hor-comb-step (first piece-type-data-cdr))
 	 (vert-comb-step (second piece-type-data-cdr))
 	 (comb-move-count ;; min combine moves to zero out hor or vert
+          (when (and hor-comb-step vert-comb-step)
+            (min (ceiling hor-dist hor-comb-step)
+                 (ceiling vert-dist vert-comb-step))))
+	 (resid-hor-dist (if comb-move-count
+                             (max 0
+                                  (- hor-dist
+                                     (* comb-move-count hor-comb-step)))
+                             hor-dist
+                             ))
+	 (resid-vert-dist (if comb-move-count
+                              (max 0
+                                   (- vert-dist
+                                      (* comb-move-count vert-comb-step)))
+                              vert-dist
+                              )))
+    (cond ((and (zerop resid-hor-dist)
+		(zerop resid-vert-dist))
+	   ;; done using only combine moves
+	   (or comb-move-count 0)) ;; in case both hor-dist and vert-dist were 0
+	  ((zerop resid-hor-dist)
+	   ;; go rest of way with vert-only-step
+	   (+ (or comb-move-count 0)
+	      (ceiling resid-vert-dist
+		       (fourth piece-type-data-cdr) ;; vert-only-step
+		       )))
+	  (t ;; go rest of way with hor-only-step
+	   (+ (or comb-move-count 0)
+	      (ceiling resid-hor-dist
+		       (third piece-type-data-cdr) ;; hor-only-step
+		       ))))))
+
+#|
+;; OLD CODE BEFORE TRY TO GENERALIZE MOVE-DATA
+(defun complex-manh-move-dist (piece-type-data-cdr hor-dist vert-dist)
+  ;; piece-type-data-cdr format:
+  ;;    ( hor-comb-step vert-comb-step hor-only-step vert-only-step )
+  (let* ((hor-comb-step (first piece-type-data-cdr))
+	 (vert-comb-step (second piece-type-data-cdr))
+	 (comb-move-count ;; min combine moves to zero out hor or vert
 	  (min (ceiling hor-dist hor-comb-step)
 	       (ceiling vert-dist vert-comb-step)))
 	 (resid-hor-dist (max 0
@@ -357,6 +410,7 @@ Type-num     Piece-descrip.   Multiplicity   Hor.   Vert    Hor,vert
 	      (ceiling resid-hor-dist
 		       (third piece-type-data-cdr) ;; hor-only-step
 		       ))))))
+|#
 
 
 ;;;;;;;;;;;;;;;;
@@ -475,6 +529,10 @@ Type-num     Piece-descrip.   Multiplicity   Hor.   Vert    Hor,vert
 ;; CLIMB12 Solution Targets
 (defparameter **climb12-target-59**
   #(1163206709 305135616 4844))
+
+;; PUZZLE-II Solution Target
+(defparameter **puzzle-ii-target-78**
+  #(857879347 269484032 170))
 
 
 ;;; when uncompressing position:

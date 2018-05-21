@@ -139,6 +139,8 @@
   nil)
 (defparameter **num-blanks**
   nil)
+(defparameter **max-piece-count**
+  nil)
 (defparameter **blank-index-range**
   nil)
 (defparameter **start-pos-with-blank-index**
@@ -181,6 +183,9 @@
 (defparameter **same-gil-hash** 0)
 (defparameter **diff-gil-hash** 0)
 
+;; for reduced search (limiting piece moves as if had only a smaller number of blanks)
+(defparameter *move-displacement-limits* nil)
+
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; DefVar's from old sliding-block puzzle solver code (near end of file)
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -215,6 +220,8 @@
 (defvar *exit-row* )
 (defvar *suspend-search* )
 (defvar *rush-hour-level* )
+(defvar *start-positions-list*)  ;; piece positions for start board, (type row col)
+
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; SBP INIT
@@ -244,9 +251,13 @@
     (climb15a  (climb15a-init))
     (climb15a-2-singletons  (climb15a-2-singletons-init))
     (climb15a-no-singletons  (climb15a-no-singletons-init))
+    (climb15a-b3 (climb15a-b3-init))  ;; only 3 blanks
     (climb24 (climb24-init))
+    (climb24-b3 (climb24-b3-init))
     (mini-climb-pro (mini-climb-pro-init))
+    (henderson-7x7 (henderson-7x7-init))
     (puzzle-beast (puzzle-beast-init))
+    (puzzle-ii (puzzle-ii-init))   ;; has exact target
     (t (error "unrecognized puzzle selector: ~a" puzzle-selector)))
   (setup-h-fun puzzle-selector)
   ;; init FSE interface globals
@@ -263,9 +274,14 @@
   ;; record max of blank-index range!
   (setf **blank-index-range**
 	(choose *num-cells* **num-blanks**))
+  ;; record maximum piece-type count
+  (setf **max-piece-count**
+        (loop for val across *start-pos*
+           maximize (logcount val)))
   ;; setup **choose-array** for calls to FAST-CHOOSE
   (setf **choose-array**
-	(precompute-choose *num-cells* **num-blanks**))
+        ;;(precompute-choose *num-cells* **num-blanks**)
+        (precompute-choose *num-cells* **max-piece-count**))
   ;; compute # bytes needed to store blank-index
   (setf **blank-index-bytes**
 	(ceiling (log (1- **blank-index-range**) 256)))
@@ -310,12 +326,21 @@
 	;; remove fill-pointer
         (make-array *position-size* :element-type 'integer))  ;; NOTE: this is a DIFFERENT "position-size" -- note single *'s (it's num-piece-types + 1)
   (setf **compressed-solution-position** nil)     ;;  global (local to domain-code) for saving "private" copy of compressed-solution
+  #|
   (setf **compressed-solution-target**
-	(loop for (piece-type bit-pattern) in *solution-target*
-           collect
-	     (list piece-type
-		   ;; was (aref **piece-type-offsets-vector** piece-type)
-		   (get-single-1-index-in-bit-pattern bit-pattern))))   ; warns if multple 1-bits
+  (loop for (piece-type bit-pattern) in *solution-target*
+  collect
+  (list piece-type
+  ;; was (aref **piece-type-offsets-vector** piece-type)
+  (get-single-1-index-in-bit-pattern bit-pattern))))   ; warns if multple 1-bits
+  |#
+  (setf **compressed-solution-target** ;; list of (piece-type cell-num)
+        (loop for (piece-type bit-pattern) in *solution-target*
+           append
+             (loop for index from 0 below (integer-length bit-pattern)
+                when (logbitp index bit-pattern)
+                collect
+                  (list piece-type index))))
   (setf **start-pos-with-blank-index**   ;; a domain position, with blank-index replacing blank-bits
 	(let* ((start-pos-copy (copy-seq *start-pos*))
 	       (start-pos-length (length *start-pos*))
@@ -551,9 +576,9 @@
 ;;; DATA COLLECTION [piece-type moves and Gil-Hash data]
 
 (defun initialize-data-collection (puzzle-name-string &optional collect-data?)
+  (setf **collect-type-and-gil-hash-data?**
+        collect-data?)
   (when collect-data?
-    (setf **collect-type-and-gil-hash-data?**
-          t)
     (let ((puzzle-name (read-from-string puzzle-name-string)))
       (print puzzle-name)
       (setf **same-gil-hash** 0
@@ -1510,6 +1535,7 @@
 
 
 (defun slide-init (board-template piece-types start-positions-list)
+  (setf *start-positions-list* start-positions-list)  ;; for translating to jimslide solver
   (setf *display-array* (copy-array board-template))
   (setf *cell-from-coords* (copy-array board-template))
   (setf *num-cells* (count-nulls board-template))
@@ -1534,15 +1560,15 @@
     (setf *linearity-of-piece*
           (make-array *num-piece-types* :initial-element nil))
     (loop for piece-type from 0 below *num-piece-types*
-          when (linear-piece? piece-type)
-          do
-          (setf (aref *linearity-of-piece* piece-type) t)))
-  ;(when *careful-mode* (print "about to initialize position pool..."))
-  ;(init-position-pool (1+ *num-piece-types*))    ;; add 1 to reflect entry for blanks (note: this call sets *position-size*)
+       when (linear-piece? piece-type)
+       do
+         (setf (aref *linearity-of-piece* piece-type) t)))
+                                        ;(when *careful-mode* (print "about to initialize position pool..."))
+                                        ;(init-position-pool (1+ *num-piece-types*))    ;; add 1 to reflect entry for blanks (note: this call sets *position-size*)
   (setf *position-size* (1+ *num-piece-types*))  ;;  need this since not using position-pool anymore
-  ;(when *careful-mode* (print "done initializing position pool")) 
+                                        ;(when *careful-mode* (print "done initializing position pool")) 
   (multiple-value-bind (move-array moves-by-dir)
-                       (generate-move-arrays)
+      (generate-move-arrays)
     (setf *move-array* move-array 
           *moves-by-dir* moves-by-dir))
   (setf *next-cell-by-dir*
@@ -1643,11 +1669,103 @@
   
 (defun count-nulls (2d-array)
   (loop for row from 0 below (array-dimension 2d-array 0)
-        sum
-        (loop for col from 0 below (array-dimension 2d-array 1)
-              count (null (aref 2d-array row col)))))
+     sum
+       (loop for col from 0 below (array-dimension 2d-array 1)
+          count (null (aref 2d-array row col)))))
 
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;; SLIDE-INIT-REDUCED
+;;;    puzzle "reduced" by omitting certain piece-types
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(defun slide-init-reduced (board-template piece-types start-positions-list
+                           piece-type-numbers-to-omit single-target-form
+                           piece-type-move-offsets)
+  (let* ((piece-type-map (piece-type-index-map piece-types piece-type-numbers-to-omit))
+         (reduced-piece-types (omit-piece-type-forms piece-types piece-type-numbers-to-omit))
+         (reduced-start-positions-list (reduce-start-list start-positions-list
+                                                          piece-type-map))
+         (new-target-piece-type (get-mapped-type (first single-target-form)
+                                                 piece-type-map))
+         (reduced-piece-type-move-offsets (when piece-type-numbers-to-omit
+                                            (omit-piece-type-forms piece-type-move-offsets
+                                                                   piece-type-numbers-to-omit))))
+    (slide-init board-template reduced-piece-types reduced-start-positions-list)
+    (single-target-from-row-col new-target-piece-type
+                                (second single-target-form)
+                                (third single-target-form))
+    (setup-move-displacement-limits reduced-piece-type-move-offsets)
+    ))
+
+(defun piece-type-index-map (piece-types omit-piece-type-nums)
+  (loop with keep-types = (loop for i from 0
+                             for type in piece-types
+                             unless (member i omit-piece-type-nums)
+                             collect i)
+     for new-i from 0
+     for old-i in keep-types
+     collect (list old-i new-i)    ;; map old-i to new-i
+       ))
+
+(defun omit-piece-type-forms (piece-type-forms omit-piece-type-nums)
+  (loop for i from 0
+     for piece-type-form in piece-type-forms
+     unless
+       (member i omit-piece-type-nums)
+     collect
+     piece-type-form))
+
+(defun reduce-start-list (start-positions-list piece-type-map)
+  ;; modify start position: omit specified pieces, change other piece-types using map
+  (loop for (type . row-col) in start-positions-list
+     for mapped-type = (get-mapped-type type piece-type-map)
+     when mapped-type
+     collect
+       (cons mapped-type row-col))
+  )
+
+;; maps old-type into reduced-type
+(defun get-mapped-type (type type-map)
+  (second (assoc type type-map)))
+
+;;; setup move limits
+
+;; *move-displacement-limits* is array indexed by piece-type & from-cell
+;;   value is a "mask" with 1's for cells that are "beyond reach"
+;;   usage: init "marked cells" so these will never be put on queue in "extension search"
+
+;; only call after reduced-puzzle is otherwise initialized
+(defun setup-move-displacement-limits (reduced-piece-row-col-delta-lists)
+  (cond (reduced-piece-row-col-delta-lists
+         (setf *move-displacement-limits* (make-array (list *num-piece-types*
+                                                            *num-cells*)))
+         (loop for piece-type from 0 below *num-piece-types*
+            for piece-type-row-col-deltas in reduced-piece-row-col-delta-lists
+            do
+              (loop for from-cell from 0 below *num-cells*
+                 for move-limit-mask = (make-move-limit-mask from-cell piece-type-row-col-deltas)
+                 do
+                   (setf (aref *move-displacement-limits* piece-type from-cell)
+                         move-limit-mask))))
+        (t (setf *move-displacement-limits* nil))))
+
+(defun make-move-limit-mask (from-cell piece-type-row-col-deltas)
+  (let* ((new-mask (make-array *num-cells* :element-type 'bit :initial-element 1))
+         (from-row-col (aref *coords-from-cell* from-cell))
+         (reachable-pairs (translate-piece piece-type-row-col-deltas from-row-col)))  ;translate pairset
+    (loop for pair in reachable-pairs
+       for pair-cellnum = (safe-cell-from-coord-pair pair)
+       when pair-cellnum
+       do
+         (setf (sbit new-mask pair-cellnum) 0))    ;; pair-cell is potentially reachable
+    (setf (sbit new-mask from-cell) 0)  ;; make sure orig cell is also ok (is this necessary?)
+    new-mask))
+
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; Used to be in "Position Pool" code - still needed by slide-init
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (defun new-domain-position ()
   (make-array *position-size* :element-type 'integer))
